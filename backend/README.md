@@ -30,6 +30,7 @@ Go 1.24 or newer is required. From this directory:
 go mod download
 make test
 make build
+make validate-infra
 ```
 
 `make build` cross-compiles every entry point for the AWS Lambda `provided.al2023`
@@ -38,3 +39,31 @@ ARM64 runtime and writes artifacts under `.build/<lambda>/bootstrap`.
 Copy `.env.example` to `.env` when running handlers against local AWS-compatible
 services. Environment variables are loaded by `internal/config`; deployed values
 should be supplied by infrastructure rather than committed to source control.
+
+## Infrastructure
+
+AWS resources are defined in [`infrastructure/template.yaml`](infrastructure/template.yaml)
+using AWS SAM. The checked-in [`samconfig.toml`](samconfig.toml) provides repeatable
+development defaults for `us-east-2`.
+
+Validate and build the complete application from this directory:
+
+```sh
+sam validate --lint
+sam build --parallel
+```
+
+Deploy the development stack after reviewing the generated change set:
+
+```sh
+sam deploy
+```
+
+To enable email notifications, override the empty default on deployment:
+
+```sh
+sam deploy --parameter-overrides AlertEmail=team@example.com
+```
+
+An SNS confirmation email must be accepted before alarm notifications are
+delivered. Use a distinct `Environment` parameter for additional stacks.

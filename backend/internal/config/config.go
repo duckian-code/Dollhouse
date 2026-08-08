@@ -9,7 +9,9 @@ type Config struct {
 	Environment          string
 	AWSRegion            string
 	UsersTableName       string
-	MoodsTableName       string
+	FriendshipsTableName string
+	MoodEventsTableName  string
+	DevicesTableName     string
 	AssetsBucketName     string
 	NotificationQueueURL string
 }
@@ -21,7 +23,9 @@ func Load() Config {
 		Environment:          getOrDefault("APP_ENV", "local"),
 		AWSRegion:            getOrDefault("AWS_REGION", "us-west-2"),
 		UsersTableName:       os.Getenv("USERS_TABLE_NAME"),
-		MoodsTableName:       os.Getenv("MOODS_TABLE_NAME"),
+		FriendshipsTableName: os.Getenv("FRIENDSHIPS_TABLE_NAME"),
+		MoodEventsTableName:  os.Getenv("MOOD_EVENTS_TABLE_NAME"),
+		DevicesTableName:     os.Getenv("DEVICES_TABLE_NAME"),
 		AssetsBucketName:     os.Getenv("ASSETS_BUCKET_NAME"),
 		NotificationQueueURL: os.Getenv("NOTIFICATION_QUEUE_URL"),
 	}

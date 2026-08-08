@@ -1,4 +1,5 @@
 .build/
+.aws-sam/
 bootstrap
 coverage.out
 .env
