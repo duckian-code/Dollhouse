@@ -24,6 +24,12 @@ Parameters:
     Type: String
     Default: ''
     Description: Optional email address subscribed to the infrastructure alarm topic.
+  TokenValidityMinutes:
+    Type: Number
+    Default: 60
+    MinValue: 5
+    MaxValue: 1440
+    Description: Access and ID token lifetime in minutes.
 
 Conditions:
   HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
@@ -314,15 +320,16 @@ Resources:
       GenerateSecret: false
       PreventUserExistenceErrors: ENABLED
       EnableTokenRevocation: true
-      AccessTokenValidity: 1
-      IdTokenValidity: 1
+      AccessTokenValidity: !Ref TokenValidityMinutes
+      IdTokenValidity: !Ref TokenValidityMinutes
       RefreshTokenValidity: 30
       TokenValidityUnits:
-        AccessToken: hours
-        IdToken: hours
+        AccessToken: minutes
+        IdToken: minutes
         RefreshToken: days
       ExplicitAuthFlows:
         - ALLOW_USER_SRP_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
 
   UserGroup:

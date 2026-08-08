@@ -67,3 +67,19 @@ sam deploy --parameter-overrides AlertEmail=team@example.com
 
 An SNS confirmation email must be accepted before alarm notifications are
 delivered. Use a distinct `Environment` parameter for additional stacks.
+
+### Cognito authorization verification
+
+The API uses the Cognito mobile client's audience and the user pool issuer for
+JWT authorization. After deployment, verify an issued token and rejection paths
+without printing token values:
+
+```sh
+VALID_ID_TOKEN="$VALID_ID_TOKEN" EXPIRED_ID_TOKEN="$EXPIRED_ID_TOKEN" \
+  bash scripts/verify-cognito-auth.sh \
+  "https://api-id.execute-api.us-east-2.amazonaws.com/dev"
+```
+
+The script treats any response other than `401` or `403` as proof that API
+Gateway accepted the valid token; feature handlers may still return `501` until
+their implementation tickets are complete.
