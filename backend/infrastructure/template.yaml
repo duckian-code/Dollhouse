@@ -360,6 +360,10 @@ Resources:
           AttributeType: S
         - AttributeName: normalizedEmail
           AttributeType: S
+        - AttributeName: searchPartition
+          AttributeType: S
+        - AttributeName: normalizedUsername
+          AttributeType: S
       KeySchema:
         - AttributeName: userId
           KeyType: HASH
@@ -368,6 +372,14 @@ Resources:
           KeySchema:
             - AttributeName: normalizedEmail
               KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: UserSearchIndex
+          KeySchema:
+            - AttributeName: searchPartition
+              KeyType: HASH
+            - AttributeName: normalizedUsername
+              KeyType: RANGE
           Projection:
             ProjectionType: ALL
       PointInTimeRecoverySpecification:
@@ -394,11 +406,22 @@ Resources:
           AttributeType: S
         - AttributeName: relatedUserId
           AttributeType: S
+        - AttributeName: statusRelatedUserId
+          AttributeType: S
       KeySchema:
         - AttributeName: userId
           KeyType: HASH
         - AttributeName: relatedUserId
           KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: UserStatusIndex
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: statusRelatedUserId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
       SSESpecification:

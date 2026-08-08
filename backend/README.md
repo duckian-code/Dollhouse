@@ -83,3 +83,16 @@ VALID_ID_TOKEN="$VALID_ID_TOKEN" EXPIRED_ID_TOKEN="$EXPIRED_ID_TOKEN" \
 The script treats any response other than `401` or `403` as proof that API
 Gateway accepted the valid token; feature handlers may still return `501` until
 their implementation tickets are complete.
+
+### DynamoDB access patterns
+
+Table keys, item shapes, consistency rules, and every MVP query are documented in
+[`infrastructure/dynamodb-access-patterns.md`](infrastructure/dynamodb-access-patterns.md).
+Seed and verify the non-production fixtures against the deployed development stack:
+
+```sh
+bash scripts/seed-dynamodb-test-data.sh
+bash scripts/verify-dynamodb-access-patterns.sh
+```
+
+Fixture primary keys begin with `TEST#` and the seed operation is idempotent.
