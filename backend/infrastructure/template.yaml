@@ -408,6 +408,8 @@ Resources:
           AttributeType: S
         - AttributeName: statusRelatedUserId
           AttributeType: S
+        - AttributeName: requestId
+          AttributeType: S
       KeySchema:
         - AttributeName: userId
           KeyType: HASH
@@ -419,6 +421,14 @@ Resources:
             - AttributeName: userId
               KeyType: HASH
             - AttributeName: statusRelatedUserId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: RequestIdIndex
+          KeySchema:
+            - AttributeName: requestId
+              KeyType: HASH
+            - AttributeName: userId
               KeyType: RANGE
           Projection:
             ProjectionType: ALL

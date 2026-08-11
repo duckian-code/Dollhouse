@@ -70,10 +70,19 @@ assert_positive "accepted friends lookup" "$accepted_count"
 incoming_count="$(aws dynamodb query --region "$region" --table-name "$friendships_table" --index-name UserStatusIndex --key-condition-expression 'userId = :user AND begins_with(statusRelatedUserId, :status)' --expression-attribute-values '{":user":{"S":"TEST#USER#CAROL"},":status":{"S":"PENDING_INCOMING#"}}' --select COUNT --query Count --output text)"
 assert_positive "incoming request lookup" "$incoming_count"
 
+request_count="$(aws dynamodb query --region "$region" --table-name "$friendships_table" --index-name RequestIdIndex --key-condition-expression 'requestId = :request' --expression-attribute-values '{":request":{"S":"TEST#REQUEST#002"}}' --select COUNT --query Count --output text)"
+assert_value "request ID lookup" "2" "$request_count"
+
 mood_count="$(aws dynamodb query --region "$region" --table-name "$mood_events_table" --key-condition-expression 'userId = :user' --expression-attribute-values '{":user":{"S":"TEST#USER#BOB"}}' --select COUNT --query Count --output text)"
 assert_positive "mood history lookup" "$mood_count"
 
+status_value="$(aws dynamodb get-item --region "$region" --table-name "$mood_events_table" --key '{"userId":{"S":"TEST#USER#BOB"},"occurredAt":{"S":"2026-08-08T17:00:00Z#TEST#EVENT#001"}}' --query 'Item.status.S' --output text)"
+assert_value "open status value" "Doing well" "$status_value"
+
 device_count="$(aws dynamodb query --region "$region" --table-name "$devices_table" --key-condition-expression 'userId = :user' --expression-attribute-values '{":user":{"S":"TEST#USER#BOB"}}' --select COUNT --query Count --output text)"
 assert_positive "device lookup" "$device_count"
+
+enabled_device_count="$(aws dynamodb query --region "$region" --table-name "$devices_table" --key-condition-expression 'userId = :user' --filter-expression 'enabled = :enabled' --expression-attribute-values '{":user":{"S":"TEST#USER#BOB"},":enabled":{"BOOL":true}}' --select COUNT --query Count --output text)"
+assert_positive "enabled notification target lookup" "$enabled_device_count"
 
 echo "All DynamoDB access patterns verified against $stack_name ($region)."

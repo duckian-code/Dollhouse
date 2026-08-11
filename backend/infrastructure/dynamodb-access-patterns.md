@@ -18,8 +18,20 @@ Indexes:
   `begins_with(normalizedUsername, :prefix)` for username search. This single
   logical partition is acceptable at MVP scale and can be sharded later.
 
-One item contains the profile, doll/room configuration, and current disclosed
-status. Asset IDs are references to the S3 catalog, never embedded assets.
+One item contains the profile, doll configuration, and current disclosed status.
+The application model is:
+
+```text
+userId, cognitoSub, email, normalizedEmail, username, normalizedUsername,
+searchPartition="USER", displayName, bio?, role, dollConfiguration?,
+currentStatus?, createdAt, updatedAt
+```
+
+`dollConfiguration` contains `bodyAssetId`, `hairAssetId`, `eyesAssetId`,
+`noseAssetId`, `mouthAssetId`, `clothingAssetIds`, and `updatedAt`.
+`currentStatus` contains the user's open `status` string, nullable `stress`,
+`fatigue`, and `discomfort` values, plus `updatedAt`. Asset IDs are references to
+the approved S3 catalog, never embedded assets.
 
 | Workflow | DynamoDB operation |
 | --- | --- |
@@ -36,19 +48,26 @@ follow an update may request strongly consistent reads on the base table.
 
 Primary key: `userId` (partition key), `relatedUserId` (sort key).
 
-Index: `UserStatusIndex`, keyed by `userId` and `statusRelatedUserId`. The index
-sort key is `<STATUS>#<relatedUserId>`, where status is `PENDING_INCOMING`,
-`PENDING_OUTGOING`, or `ACCEPTED`.
+Indexes:
+
+- `UserStatusIndex`, keyed by `userId` and `statusRelatedUserId`. The index sort
+  key is `<STATUS>#<relatedUserId>`, where status is `PENDING_INCOMING`,
+  `PENDING_OUTGOING`, or `ACCEPTED`.
+- `RequestIdIndex`, keyed by `requestId` and `userId`. It resolves the opaque
+  request ID used by the accept and decline API routes without a table scan.
 
 Each relationship is stored as two mirrored items. Send, accept, decline, and
 remove operations must use `TransactWriteItems` so both users see one state.
 Self-friendship and duplicate requests are rejected with condition expressions.
+Pending mirror items share `requestId`, `requestedBy`, and `requestedAt`.
+Accepted mirrors retain `requestId` for traceability and add `acceptedAt`.
 
 | Workflow | DynamoDB operation |
 | --- | --- |
 | Read relationship to a specific user | `GetItem(userId, relatedUserId)` |
 | List incoming/outgoing requests | `Query UserStatusIndex` with `begins_with(statusRelatedUserId, :status)` |
 | List accepted friends | same index query using `ACCEPTED#` |
+| Resolve an accept/decline route ID | `Query RequestIdIndex` with `requestId = :requestId` and verify the signed-in user owns the incoming item |
 | Send request | transactional put of outgoing and incoming mirror items |
 | Accept request | transactional update of both items to `ACCEPTED` |
 | Decline request or remove friend | transactional delete of both mirror items |
@@ -64,13 +83,21 @@ an ISO-8601 UTC timestamp suffixed with `#<eventId>` to prevent collisions.
 | Read a user's history window | `Query userId` with `BETWEEN` bounds |
 | Read most recent event | `Query userId`, descending, limit one |
 
-Publishing a mood transactionally updates the current status on the Users item
+Each event stores `eventId`, the open `status` string, nullable `stress`,
+`fatigue`, and `discomfort` values, `visibility = FRIENDS`, and `updatedAt`.
+There is no fixed mood catalogue or `moodId` in the current contract.
+
+Publishing a status transactionally updates `currentStatus` on the Users item
 and appends a MoodEvents item. Notification messages contain identifiers only;
-they do not duplicate sensitive mood values.
+they do not duplicate sensitive status or slider values.
 
 ## Devices
 
 Primary key: `userId` (partition key), `deviceId` (sort key).
+
+Each item contains `pushToken`, `platform`, `enabled`, and `updatedAt` in
+addition to its keys. Disabled devices remain addressable for cleanup but are
+excluded from notification targets.
 
 | Workflow | DynamoDB operation |
 | --- | --- |
