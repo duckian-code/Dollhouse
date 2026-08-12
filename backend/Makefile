@@ -1,4 +1,4 @@
-.PHONY: build test validate-infra clean
+.PHONY: build test validate-infra verify-s3-security clean
 
 COMMANDS := $(notdir $(wildcard cmd/*))
 
@@ -14,6 +14,9 @@ test:
 
 validate-infra:
 	sam validate --lint --template-file infrastructure/template.yaml
+
+verify-s3-security:
+	bash scripts/verify-s3-security.sh
 
 clean:
 	rm -rf .build

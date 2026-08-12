@@ -96,3 +96,28 @@ bash scripts/verify-dynamodb-access-patterns.sh
 ```
 
 Fixture primary keys begin with `TEST#` and the seed operation is idempotent.
+
+### Secure asset storage
+
+The asset bucket is private, encrypted with S3-managed keys, versioned, and uses
+bucket-owner-enforced object ownership. Its bucket policy denies every request
+that does not use TLS. Incomplete multipart uploads are removed after seven days
+to avoid paying for abandoned upload parts.
+
+The bucket intentionally contains no catalog or avatar objects until the launch
+art is approved. Asset uploads and retrieval tests should be added with that
+catalog; do not use public-read ACLs or a public bucket policy. The bucket's CORS
+configuration only permits `GET` and `HEAD` and does not grant access by itself.
+
+After deploying the stack, verify the security controls without reading any
+objects:
+
+```sh
+make verify-s3-security
+```
+
+Pass a different stack name as the script's first argument when needed:
+
+```sh
+bash scripts/verify-s3-security.sh dollhouse-staging
+```
