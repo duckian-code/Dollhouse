@@ -1,5 +1,18 @@
 package main
 
-import "github.com/dollhouse-app/dollhouse/backend/internal/handler"
+import (
+	"context"
+	"log"
 
-func main() { handler.StartAPI("update-doll-configuration") }
+	"github.com/dollhouse-app/dollhouse/backend/internal/config"
+	"github.com/dollhouse-app/dollhouse/backend/internal/handler"
+	"github.com/dollhouse-app/dollhouse/backend/internal/profiledoll"
+)
+
+func main() {
+	handlers, err := profiledoll.NewRuntimeHandlers(context.Background(), config.Load())
+	if err != nil {
+		log.Fatal(err)
+	}
+	handler.StartAPIHandler(handlers.UpdateDoll)
+}

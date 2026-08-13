@@ -10,6 +10,9 @@ import (
 	"github.com/dollhouse-app/dollhouse/backend/pkg/response"
 )
 
+// API is the request shape accepted by API Gateway v2 Lambda integrations.
+type API func(context.Context, events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error)
+
 // StartAPI starts a named API Gateway Lambda. Feature tickets replace the
 // placeholder behavior by passing a domain handler through this adapter.
 func StartAPI(name string) {
@@ -17,3 +20,6 @@ func StartAPI(name string) {
 		return response.Error(http.StatusNotImplemented, "not_implemented", name+" is not implemented"), nil
 	})
 }
+
+// StartAPIHandler starts a fully implemented API Gateway Lambda handler.
+func StartAPIHandler(api API) { lambda.Start(api) }
