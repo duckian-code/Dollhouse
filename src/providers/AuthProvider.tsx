@@ -9,10 +9,16 @@ import {
 } from 'react';
 
 import {
+  getCurrentAccountId,
   hasAuthenticatedUser,
   login as cognitoLogin,
   logout as cognitoLogout,
 } from '@/services/auth/cognito';
+import {
+  clearAccountCache,
+  initializeCache,
+  pruneExpiredCache,
+} from '@/services/cache/repositories';
 
 type AuthContextValue = {
   isAuthenticated: boolean;
@@ -28,8 +34,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    hasAuthenticatedUser()
-      .then(setIsAuthenticated)
+    Promise.all([initializeCache(), hasAuthenticatedUser()])
+      .then(([, authenticated]) => {
+        setIsAuthenticated(authenticated);
+        void pruneExpiredCache();
+      })
       .finally(() => setIsLoading(false));
   }, []);
 
@@ -42,6 +51,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const logout = useCallback(async () => {
+    const accountId = await getCurrentAccountId();
+    await clearAccountCache(accountId);
     await cognitoLogout();
     setIsAuthenticated(false);
   }, []);

@@ -97,3 +97,9 @@ export async function getAccessToken() {
   const session = await fetchAuthSession();
   return session.tokens?.accessToken?.toString();
 }
+
+export async function getCurrentAccountId() {
+  requireConfiguration();
+  const user = await getCurrentUser();
+  return user.userId;
+}
