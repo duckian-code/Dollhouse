@@ -32,6 +32,7 @@ endef
 $(eval $(call BUILD_LAMBDA,get-current-profile,GetCurrentProfileFunction))
 $(eval $(call BUILD_LAMBDA,update-profile,UpdateProfileFunction))
 $(eval $(call BUILD_LAMBDA,get-doll-configuration,GetDollConfigurationFunction))
+$(eval $(call BUILD_LAMBDA,get-asset-catalog,GetAssetCatalogFunction))
 $(eval $(call BUILD_LAMBDA,update-doll-configuration,UpdateDollConfigurationFunction))
 $(eval $(call BUILD_LAMBDA,search-users,SearchUsersFunction))
 $(eval $(call BUILD_LAMBDA,send-friend-request,SendFriendRequestFunction))

@@ -55,6 +55,7 @@ Globals:
         MOOD_EVENTS_TABLE_NAME: !Ref MoodEventsTable
         DEVICES_TABLE_NAME: !Ref DevicesTable
         ASSETS_BUCKET_NAME: !Ref AssetsBucket
+        ASSET_CATALOG_KEY: catalog/v1.json
         NOTIFICATION_QUEUE_URL: !Ref NotificationQueue
     Tags:
       Project: !Ref ProjectName
@@ -167,6 +168,28 @@ Resources:
           Properties:
             ApiId: !Ref DollhouseApi
             Path: /doll
+            Method: GET
+
+  GetAssetCatalogFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Sid: ReadApprovedAssetCatalogAndObjects
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:GetObjectVersion
+              Resource: !Sub '${AssetsBucket.Arn}/*'
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DollhouseApi
+            Path: /assets/catalog
             Method: GET
 
   UpdateDollConfigurationFunction:

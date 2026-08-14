@@ -12,6 +12,7 @@ handlers are intentionally thin entry points; reusable behavior belongs in
 | Profile | Update profile | `cmd/update-profile` |
 | Doll | Get doll configuration | `cmd/get-doll-configuration` |
 | Doll | Update doll configuration | `cmd/update-doll-configuration` |
+| Assets | Get approved asset catalog | `cmd/get-asset-catalog` |
 | Friendship | Search users | `cmd/search-users` |
 | Friendship | Send friend request | `cmd/send-friend-request` |
 | Friendship | List friend requests | `cmd/list-friend-requests` |
@@ -104,10 +105,13 @@ bucket-owner-enforced object ownership. Its bucket policy denies every request
 that does not use TLS. Incomplete multipart uploads are removed after seven days
 to avoid paying for abandoned upload parts.
 
-The bucket intentionally contains no catalog or avatar objects until the launch
-art is approved. Asset uploads and retrieval tests should be added with that
-catalog; do not use public-read ACLs or a public bucket policy. The bucket's CORS
-configuration only permits `GET` and `HEAD` and does not grant access by itself.
+Approved launch assets are described by `catalog/v1.json` in the bucket. The
+authenticated `GET /assets/catalog` route reads that private manifest and
+returns 15-minute, version-specific presigned URLs. Clients use the opaque
+`assetId` values for saved doll configurations and should refresh the catalog
+when its URLs expire. Do not use public-read ACLs or a public bucket policy. The
+bucket's CORS configuration only permits `GET` and `HEAD` and does not grant
+access by itself.
 
 After deploying the stack, verify the security controls without reading any
 objects:

@@ -13,6 +13,8 @@ type Config struct {
 	MoodEventsTableName  string
 	DevicesTableName     string
 	AssetsBucketName     string
+	AssetCatalogKey      string
+	AssetURLTTLSeconds   int
 	NotificationQueueURL string
 }
 
@@ -27,6 +29,8 @@ func Load() Config {
 		MoodEventsTableName:  os.Getenv("MOOD_EVENTS_TABLE_NAME"),
 		DevicesTableName:     os.Getenv("DEVICES_TABLE_NAME"),
 		AssetsBucketName:     os.Getenv("ASSETS_BUCKET_NAME"),
+		AssetCatalogKey:      getOrDefault("ASSET_CATALOG_KEY", "catalog/v1.json"),
+		AssetURLTTLSeconds:   900,
 		NotificationQueueURL: os.Getenv("NOTIFICATION_QUEUE_URL"),
 	}
 }
