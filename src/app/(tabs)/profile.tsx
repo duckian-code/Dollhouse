@@ -1,11 +1,14 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { SectionHeader } from '@/components/SectionHeader';
+import { useAuth } from '@/providers/AuthProvider';
 import { tokens } from '@/theme/tokens';
 
 export default function ProfileScreen() {
+  const { logout } = useAuth();
+
   return (
     <AppScreen>
       <SectionHeader
@@ -23,6 +26,13 @@ export default function ProfileScreen() {
         <Text style={styles.name}>Dollhouse resident</Text>
         <Text style={styles.detail}>Profile customization is coming soon.</Text>
       </AppCard>
+      <Pressable
+        accessibilityRole="button"
+        onPress={logout}
+        style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}
+      >
+        <Text style={styles.signOutText}>Sign out</Text>
+      </Pressable>
     </AppScreen>
   );
 }
@@ -50,4 +60,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
+  signOut: {
+    minHeight: 52,
+    marginTop: tokens.spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: tokens.color.accent,
+    borderRadius: tokens.radius.round,
+  },
+  pressed: { opacity: 0.7 },
+  signOutText: { color: tokens.color.accent, fontSize: 16, fontWeight: '700' },
 });
