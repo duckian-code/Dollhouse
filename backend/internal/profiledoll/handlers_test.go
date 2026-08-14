@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/dollhouse-app/dollhouse/backend/internal/assetcatalog"
 )
 
 type fakeStore struct {
@@ -19,6 +20,16 @@ type fakeStore struct {
 	changes       ProfileChanges
 	getDollUserID string
 	dollUserID    string
+}
+
+type fakeAssetValidator struct {
+	references []assetcatalog.Reference
+	err        error
+}
+
+func (v *fakeAssetValidator) Validate(_ context.Context, references []assetcatalog.Reference) error {
+	v.references = references
+	return v.err
 }
 
 func (s *fakeStore) EnsureUser(_ context.Context, identity Identity, _ string) (Profile, error) {
@@ -53,7 +64,7 @@ func authenticatedRequest(body string) events.APIGatewayV2HTTPRequest {
 }
 
 func fixedHandlers(store Store) *Handlers {
-	h := NewHandlers(store)
+	h := NewHandlers(store, &fakeAssetValidator{})
 	h.now = func() time.Time { return time.Date(2026, 8, 13, 12, 30, 45, 0, time.FixedZone("test", -6*60*60)) }
 	return h
 }
@@ -146,8 +157,11 @@ func TestGetDollReturnsNotFoundWhenNotConfigured(t *testing.T) {
 
 func TestUpdateDollReplacesConfigurationForAuthenticatedUser(t *testing.T) {
 	store := &fakeStore{}
+	assets := &fakeAssetValidator{}
 	body := `{"bodyAssetId":"body-1","hairAssetId":"hair-1","eyesAssetId":"eyes-1","noseAssetId":"nose-1","mouthAssetId":"mouth-1","clothingAssetIds":["shirt-1"]}`
-	got, err := fixedHandlers(store).UpdateDoll(context.Background(), authenticatedRequest(body))
+	handlers := NewHandlers(store, assets)
+	handlers.now = func() time.Time { return time.Date(2026, 8, 13, 12, 30, 45, 0, time.FixedZone("test", -6*60*60)) }
+	got, err := handlers.UpdateDoll(context.Background(), authenticatedRequest(body))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,6 +170,9 @@ func TestUpdateDollReplacesConfigurationForAuthenticatedUser(t *testing.T) {
 	}
 	if store.dollUserID != "user-123" {
 		t.Fatalf("updated user = %q", store.dollUserID)
+	}
+	if len(assets.references) != 6 || assets.references[0] != (assetcatalog.Reference{Field: "bodyAssetId", AssetID: "body-1", Category: "body"}) || assets.references[5] != (assetcatalog.Reference{Field: "clothingAssetIds[0]", AssetID: "shirt-1", Category: "clothing"}) {
+		t.Fatalf("asset references = %#v", assets.references)
 	}
 	var responseBody struct {
 		Data struct {
@@ -167,6 +184,34 @@ func TestUpdateDollReplacesConfigurationForAuthenticatedUser(t *testing.T) {
 	}
 	if responseBody.Data.Configuration.UpdatedAt != "2026-08-13T18:30:45Z" {
 		t.Fatalf("configuration = %#v", responseBody.Data.Configuration)
+	}
+}
+
+func TestUpdateDollRejectsUnapprovedAssetBeforeWriting(t *testing.T) {
+	store := &fakeStore{}
+	assets := &fakeAssetValidator{err: &assetcatalog.SelectionError{Message: `bodyAssetId references unapproved asset ID "body-unknown"`}}
+	body := `{"bodyAssetId":"body-unknown","hairAssetId":"hair-1","eyesAssetId":"eyes-1","noseAssetId":"nose-1","mouthAssetId":"mouth-1","clothingAssetIds":[]}`
+	got, err := NewHandlers(store, assets).UpdateDoll(context.Background(), authenticatedRequest(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.StatusCode != 400 || !jsonErrorCode(got.Body, "validation_failed") {
+		t.Fatalf("response = %#v", got)
+	}
+	if store.dollUserID != "" || len(store.ensured) != 0 {
+		t.Fatalf("invalid configuration reached storage: store = %#v", store)
+	}
+}
+
+func TestUpdateDollDoesNotExposeCatalogFailures(t *testing.T) {
+	assets := &fakeAssetValidator{err: errors.New("secret S3 detail")}
+	body := `{"bodyAssetId":"body-1","hairAssetId":"hair-1","eyesAssetId":"eyes-1","noseAssetId":"nose-1","mouthAssetId":"mouth-1","clothingAssetIds":[]}`
+	got, err := NewHandlers(&fakeStore{}, assets).UpdateDoll(context.Background(), authenticatedRequest(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.StatusCode != 500 || !jsonErrorCode(got.Body, "internal_error") || contains(got.Body, "secret S3 detail") {
+		t.Fatalf("response = %#v", got)
 	}
 }
 

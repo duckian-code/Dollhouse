@@ -200,6 +200,13 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref UsersTable
+        - Version: '2012-10-17'
+          Statement:
+            - Sid: ReadApprovedAssetCatalog
+              Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub '${AssetsBucket.Arn}/catalog/v1.json'
       Events:
         Api:
           Type: HttpApi

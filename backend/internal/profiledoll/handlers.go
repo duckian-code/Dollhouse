@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/dollhouse-app/dollhouse/backend/internal/assetcatalog"
 	"github.com/dollhouse-app/dollhouse/backend/pkg/response"
 )
 
@@ -22,13 +23,18 @@ const maxRequestBodyBytes = 32 * 1024
 
 // Handlers implements the four profile and doll Lambda routes.
 type Handlers struct {
-	store Store
-	now   func() time.Time
+	store          Store
+	assetValidator interface {
+		Validate(context.Context, []assetcatalog.Reference) error
+	}
+	now func() time.Time
 }
 
 // NewHandlers creates handlers with production clock behavior.
-func NewHandlers(store Store) *Handlers {
-	return &Handlers{store: store, now: time.Now}
+func NewHandlers(store Store, assetValidator interface {
+	Validate(context.Context, []assetcatalog.Reference) error
+}) *Handlers {
+	return &Handlers{store: store, assetValidator: assetValidator, now: time.Now}
 }
 
 // GetProfile returns the signed-in user's profile, creating its initial record
@@ -152,6 +158,12 @@ func (h *Handlers) UpdateDoll(ctx context.Context, request events.APIGatewayV2HT
 	configuration, err := validateDoll(input)
 	if err != nil {
 		return response.Error(http.StatusBadRequest, "validation_failed", err.Error()), nil
+	}
+	if err = h.assetValidator.Validate(ctx, assetReferences(configuration)); err != nil {
+		if assetcatalog.IsSelectionError(err) {
+			return response.Error(http.StatusBadRequest, "validation_failed", err.Error()), nil
+		}
+		return internalError("validate doll assets", err), nil
 	}
 	now := h.timestamp()
 	if _, err = h.store.EnsureUser(ctx, identity, now); err != nil {
@@ -293,6 +305,22 @@ func validateDoll(input updateDollRequest) (DollConfiguration, error) {
 		seen[id] = struct{}{}
 	}
 	return configuration, nil
+}
+
+func assetReferences(configuration DollConfiguration) []assetcatalog.Reference {
+	references := []assetcatalog.Reference{
+		{Field: "bodyAssetId", AssetID: configuration.BodyAssetID, Category: "body"},
+		{Field: "hairAssetId", AssetID: configuration.HairAssetID, Category: "hair"},
+		{Field: "eyesAssetId", AssetID: configuration.EyesAssetID, Category: "eyes"},
+		{Field: "noseAssetId", AssetID: configuration.NoseAssetID, Category: "nose"},
+		{Field: "mouthAssetId", AssetID: configuration.MouthAssetID, Category: "mouth"},
+	}
+	for index, assetID := range configuration.ClothingAssetIDs {
+		references = append(references, assetcatalog.Reference{
+			Field: fmt.Sprintf("clothingAssetIds[%d]", index), AssetID: assetID, Category: "clothing",
+		})
+	}
+	return references
 }
 
 func (h *Handlers) timestamp() string {

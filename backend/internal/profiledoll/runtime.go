@@ -6,6 +6,8 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/dollhouse-app/dollhouse/backend/internal/assetcatalog"
 	appconfig "github.com/dollhouse-app/dollhouse/backend/internal/config"
 )
 
@@ -16,5 +18,6 @@ func NewRuntimeHandlers(ctx context.Context, cfg appconfig.Config) (*Handlers, e
 		return nil, fmt.Errorf("load AWS configuration: %w", err)
 	}
 	store := NewDynamoDBStore(dynamodb.NewFromConfig(awsCfg), cfg.UsersTableName)
-	return NewHandlers(store), nil
+	assetValidator := assetcatalog.NewValidator(s3.NewFromConfig(awsCfg), cfg.AssetsBucketName, cfg.AssetCatalogKey)
+	return NewHandlers(store, assetValidator), nil
 }
