@@ -1,0 +1,201 @@
+package moodstatus
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"io"
+	"log"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/dollhouse-app/dollhouse/backend/pkg/response"
+)
+
+const maxRequestBodyBytes = 32 * 1024
+
+// DomainError maps an expected storage/domain failure to an API response.
+type DomainError struct {
+	Status  int
+	Code    string
+	Message string
+}
+
+func (e *DomainError) Error() string { return e.Message }
+
+// Handlers implements the mood publishing and friend-status routes.
+type Handlers struct {
+	store Store
+	now   func() time.Time
+	newID func() (string, error)
+}
+
+// NewHandlers creates handlers with production clock and identifier behavior.
+func NewHandlers(store Store) *Handlers {
+	return &Handlers{store: store, now: time.Now, newID: randomID}
+}
+
+type publishMoodRequest struct {
+	Status     json.RawMessage `json:"status"`
+	Stress     json.RawMessage `json:"stress"`
+	Fatigue    json.RawMessage `json:"fatigue"`
+	Discomfort json.RawMessage `json:"discomfort"`
+}
+
+// PublishMood validates and saves a new current status and history event.
+func (h *Handlers) PublishMood(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	userID, failure := authenticatedUserID(request)
+	if failure != nil {
+		return *failure, nil
+	}
+	var input publishMoodRequest
+	if failure = decodeBody(request, &input); failure != nil {
+		return *failure, nil
+	}
+	state, message := validateMood(input)
+	if message != "" {
+		return response.Error(http.StatusBadRequest, "validation_failed", message), nil
+	}
+	eventID, err := h.newID()
+	if err != nil {
+		return internalError("generate mood event ID", err), nil
+	}
+	state.UpdatedAt = h.timestamp()
+	if err := h.store.PublishMood(ctx, userID, eventID, state); err != nil {
+		return h.failure("publish mood", err), nil
+	}
+	return response.JSON(http.StatusCreated, map[string]any{"data": map[string]any{"eventId": eventID, "status": state}})
+}
+
+// GetFriendStatuses returns the current state of accepted friends only.
+func (h *Handlers) GetFriendStatuses(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	userID, failure := authenticatedUserID(request)
+	if failure != nil {
+		return *failure, nil
+	}
+	items, nextToken, err := h.store.ListFriendStatuses(ctx, userID, request.QueryStringParameters["nextToken"])
+	if err != nil {
+		return h.failure("get friend statuses", err), nil
+	}
+	var token any
+	if nextToken != "" {
+		token = nextToken
+	}
+	return response.JSON(http.StatusOK, map[string]any{"data": map[string]any{"items": items, "nextToken": token}})
+}
+
+func validateMood(input publishMoodRequest) (MoodState, string) {
+	var status string
+	if len(input.Status) == 0 || bytes.Equal(bytes.TrimSpace(input.Status), []byte("null")) {
+		return MoodState{}, "status is required and must be a non-empty string"
+	}
+	if err := json.Unmarshal(input.Status, &status); err != nil || strings.TrimSpace(status) == "" {
+		return MoodState{}, "status is required and must be a non-empty string"
+	}
+	status = strings.TrimSpace(status)
+	stress, message := parseSlider("stress", input.Stress)
+	if message != "" {
+		return MoodState{}, message
+	}
+	fatigue, message := parseSlider("fatigue", input.Fatigue)
+	if message != "" {
+		return MoodState{}, message
+	}
+	discomfort, message := parseSlider("discomfort", input.Discomfort)
+	if message != "" {
+		return MoodState{}, message
+	}
+	return MoodState{Status: status, Stress: stress, Fatigue: fatigue, Discomfort: discomfort}, ""
+}
+
+func parseSlider(name string, raw json.RawMessage) (*int, string) {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		return nil, ""
+	}
+	value, err := strconv.Atoi(string(trimmed))
+	if err != nil {
+		return nil, name + " must be an integer between 0 and 10"
+	}
+	if value < 0 || value > 10 {
+		return nil, name + " must be between 0 and 10"
+	}
+	return &value, ""
+}
+
+func authenticatedUserID(request events.APIGatewayV2HTTPRequest) (string, *events.APIGatewayV2HTTPResponse) {
+	if request.RequestContext.Authorizer == nil || request.RequestContext.Authorizer.JWT == nil {
+		failure := response.Error(http.StatusUnauthorized, "unauthenticated", "valid Cognito authentication is required")
+		return "", &failure
+	}
+	userID := strings.TrimSpace(request.RequestContext.Authorizer.JWT.Claims["sub"])
+	if userID == "" {
+		failure := response.Error(http.StatusUnauthorized, "unauthenticated", "valid Cognito authentication is required")
+		return "", &failure
+	}
+	return userID, nil
+}
+
+func decodeBody(request events.APIGatewayV2HTTPRequest, target any) *events.APIGatewayV2HTTPResponse {
+	body := []byte(request.Body)
+	if request.IsBase64Encoded {
+		decoded, err := base64.StdEncoding.DecodeString(request.Body)
+		if err != nil {
+			failure := response.Error(http.StatusBadRequest, "invalid_request", "request body is not valid base64")
+			return &failure
+		}
+		body = decoded
+	}
+	if len(body) == 0 || len(body) > maxRequestBodyBytes {
+		message := "request body is required"
+		if len(body) > maxRequestBodyBytes {
+			message = "request body is too large"
+		}
+		failure := response.Error(http.StatusBadRequest, "invalid_request", message)
+		return &failure
+	}
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		failure := response.Error(http.StatusBadRequest, "invalid_request", "request body must be valid JSON: "+err.Error())
+		return &failure
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		failure := response.Error(http.StatusBadRequest, "invalid_request", "request body must contain one JSON object")
+		return &failure
+	}
+	return nil
+}
+
+func (h *Handlers) failure(operation string, err error) events.APIGatewayV2HTTPResponse {
+	var domain *DomainError
+	if errors.As(err, &domain) {
+		return response.Error(domain.Status, domain.Code, domain.Message)
+	}
+	return internalError(operation, err)
+}
+
+func internalError(operation string, err error) events.APIGatewayV2HTTPResponse {
+	log.Printf("%s: %v", operation, err)
+	return response.Error(http.StatusInternalServerError, "internal_error", "an internal error occurred")
+}
+
+func (h *Handlers) timestamp() string {
+	return h.now().UTC().Truncate(time.Second).Format(time.RFC3339)
+}
+
+func randomID() (string, error) {
+	value := make([]byte, 16)
+	if _, err := rand.Read(value); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(value), nil
+}

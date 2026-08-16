@@ -322,6 +322,11 @@ Resources:
     Metadata:
       BuildMethod: makefile
     Properties:
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MoodEventsTable
       Events:
         Api:
           Type: HttpApi
@@ -335,6 +340,11 @@ Resources:
     Metadata:
       BuildMethod: makefile
     Properties:
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref FriendshipsTable
       Events:
         Api:
           Type: HttpApi

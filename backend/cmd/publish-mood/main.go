@@ -1,5 +1,18 @@
 package main
 
-import "github.com/dollhouse-app/dollhouse/backend/internal/handler"
+import (
+	"context"
+	"log"
 
-func main() { handler.StartAPI("publish-mood") }
+	"github.com/dollhouse-app/dollhouse/backend/internal/config"
+	"github.com/dollhouse-app/dollhouse/backend/internal/handler"
+	"github.com/dollhouse-app/dollhouse/backend/internal/moodstatus"
+)
+
+func main() {
+	handlers, err := moodstatus.NewRuntimeHandlers(context.Background(), config.Load())
+	if err != nil {
+		log.Fatalf("initialize publish mood handler: %v", err)
+	}
+	handler.StartAPIHandler(handlers.PublishMood)
+}
