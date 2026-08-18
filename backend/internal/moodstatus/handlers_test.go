@@ -19,6 +19,8 @@ type fakeStore struct {
 	nextToken       string
 	requestedToken  string
 	err             error
+	recipients      []string
+	recipientErr    error
 }
 
 func (s *fakeStore) PublishMood(_ context.Context, userID, eventID string, state MoodState) error {
@@ -31,6 +33,20 @@ func (s *fakeStore) ListFriendStatuses(_ context.Context, userID, token string) 
 	return s.items, s.nextToken, s.err
 }
 
+func (s *fakeStore) ListNotificationRecipientIDs(_ context.Context, _ string) ([]string, error) {
+	return s.recipients, s.recipientErr
+}
+
+type fakePublisher struct {
+	jobs []NotificationJob
+	err  error
+}
+
+func (p *fakePublisher) Publish(_ context.Context, job NotificationJob) error {
+	p.jobs = append(p.jobs, job)
+	return p.err
+}
+
 func authenticatedRequest(body string) events.APIGatewayV2HTTPRequest {
 	request := events.APIGatewayV2HTTPRequest{Body: body}
 	request.RequestContext.Authorizer = &events.APIGatewayV2HTTPRequestContextAuthorizerDescription{
@@ -40,15 +56,20 @@ func authenticatedRequest(body string) events.APIGatewayV2HTTPRequest {
 }
 
 func fixedHandlers(store Store) *Handlers {
-	handlers := NewHandlers(store)
+	handlers := NewHandlers(store, &fakePublisher{})
 	handlers.now = func() time.Time { return time.Date(2026, 8, 16, 12, 30, 45, 0, time.FixedZone("test", -6*60*60)) }
 	handlers.newID = func() (string, error) { return "event-123", nil }
 	return handlers
 }
 
 func TestPublishMoodReturnsContractShapeAndPreservesNullSliders(t *testing.T) {
-	store := &fakeStore{}
-	got, err := fixedHandlers(store).PublishMood(context.Background(), authenticatedRequest(`{"status":" Feeling okay ","stress":3,"fatigue":null}`))
+	store := &fakeStore{recipients: []string{"friend-1", "friend-2"}}
+	publisher := &fakePublisher{}
+	handlers := fixedHandlers(store)
+	handlers.publisher = publisher
+	request := authenticatedRequest(`{"status":" Feeling okay ","stress":3,"fatigue":null}`)
+	request.Headers = map[string]string{"X-Correlation-Id": "request-456"}
+	got, err := handlers.PublishMood(context.Background(), request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,6 +90,13 @@ func TestPublishMoodReturnsContractShapeAndPreservesNullSliders(t *testing.T) {
 	}
 	if body.Data.EventID != "event-123" || body.Data.Status.Stress == nil || body.Data.Status.Fatigue != nil {
 		t.Fatalf("body=%#v", body)
+	}
+	if len(publisher.jobs) != 1 {
+		t.Fatalf("jobs=%#v", publisher.jobs)
+	}
+	job := publisher.jobs[0]
+	if job.SchemaVersion != 1 || job.EventID != "event-123" || job.SenderUserID != "user-123" || job.CorrelationID != "request-456" || job.CreatedAt != "2026-08-16T18:30:45Z" || len(job.RecipientUserIDs) != 2 {
+		t.Fatalf("job=%#v", job)
 	}
 }
 
@@ -133,6 +161,17 @@ func TestExpectedAndUnexpectedStoreErrorsAreSafe(t *testing.T) {
 	got, _ = fixedHandlers(store).PublishMood(context.Background(), authenticatedRequest(`{"status":"okay"}`))
 	if got.StatusCode != http.StatusInternalServerError || errorCode(got.Body) != "internal_error" {
 		t.Fatalf("response=%#v", got)
+	}
+}
+
+func TestPublishMoodReturnsInternalErrorWhenQueueingFails(t *testing.T) {
+	store := &fakeStore{recipients: []string{"friend-1"}}
+	publisher := &fakePublisher{err: errors.New("queue secret")}
+	handlers := fixedHandlers(store)
+	handlers.publisher = publisher
+	got, err := handlers.PublishMood(context.Background(), authenticatedRequest(`{"status":"okay"}`))
+	if err != nil || got.StatusCode != http.StatusInternalServerError || errorCode(got.Body) != "internal_error" || len(publisher.jobs) != 1 {
+		t.Fatalf("response=%#v err=%v jobs=%#v", got, err, publisher.jobs)
 	}
 }
 

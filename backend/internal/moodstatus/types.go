@@ -42,5 +42,22 @@ type FriendStatus struct {
 // Store is the persistence boundary used by mood and status handlers.
 type Store interface {
 	PublishMood(context.Context, string, string, MoodState) error
+	ListNotificationRecipientIDs(context.Context, string) ([]string, error)
 	ListFriendStatuses(context.Context, string, string) ([]FriendStatus, string, error)
+}
+
+// NotificationJob is the identifier-only message sent after a mood is saved.
+// It intentionally excludes the free-form status and slider values.
+type NotificationJob struct {
+	SchemaVersion    int      `json:"schemaVersion"`
+	EventID          string   `json:"eventId"`
+	SenderUserID     string   `json:"senderUserId"`
+	RecipientUserIDs []string `json:"recipientUserIds"`
+	CorrelationID    string   `json:"correlationId"`
+	CreatedAt        string   `json:"createdAt"`
+}
+
+// NotificationPublisher queues asynchronous notification work.
+type NotificationPublisher interface {
+	Publish(context.Context, NotificationJob) error
 }

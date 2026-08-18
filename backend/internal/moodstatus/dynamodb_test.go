@@ -14,6 +14,7 @@ import (
 type fakeDynamoDB struct {
 	batchOutputs  []*dynamodb.BatchGetItemOutput
 	queryOutput   *dynamodb.QueryOutput
+	queryOutputs  []*dynamodb.QueryOutput
 	batchInputs   []*dynamodb.BatchGetItemInput
 	queryInput    *dynamodb.QueryInput
 	transactInput *dynamodb.TransactWriteItemsInput
@@ -32,10 +33,39 @@ func (f *fakeDynamoDB) BatchGetItem(_ context.Context, input *dynamodb.BatchGetI
 
 func (f *fakeDynamoDB) Query(_ context.Context, input *dynamodb.QueryInput, _ ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
 	f.queryInput = input
+	if len(f.queryOutputs) > 0 {
+		output := f.queryOutputs[0]
+		f.queryOutputs = f.queryOutputs[1:]
+		return output, nil
+	}
 	if f.queryOutput == nil {
 		return &dynamodb.QueryOutput{}, nil
 	}
 	return f.queryOutput, nil
+}
+
+func TestListNotificationRecipientIDsPaginatesAndDeduplicates(t *testing.T) {
+	key := map[string]types.AttributeValue{"relatedUserId": &types.AttributeValueMemberS{Value: "friend-2"}}
+	client := &fakeDynamoDB{queryOutputs: []*dynamodb.QueryOutput{
+		{Items: []map[string]types.AttributeValue{
+			{"relatedUserId": &types.AttributeValueMemberS{Value: "friend-1"}},
+			{"relatedUserId": &types.AttributeValueMemberS{Value: "friend-2"}},
+		}, LastEvaluatedKey: key},
+		{Items: []map[string]types.AttributeValue{
+			{"relatedUserId": &types.AttributeValueMemberS{Value: "friend-2"}},
+			{"relatedUserId": &types.AttributeValueMemberS{Value: "friend-3"}},
+		}},
+	}}
+	recipients, err := NewDynamoDBStore(client, "users", "friendships", "moods").ListNotificationRecipientIDs(context.Background(), "self")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recipients) != 3 || recipients[0] != "friend-1" || recipients[1] != "friend-2" || recipients[2] != "friend-3" {
+		t.Fatalf("recipients=%#v", recipients)
+	}
+	if client.queryInput.IndexName == nil || *client.queryInput.IndexName != userStatusIndex || client.queryInput.ProjectionExpression == nil || *client.queryInput.ProjectionExpression != "relatedUserId" {
+		t.Fatalf("query=%#v", client.queryInput)
+	}
 }
 
 func (f *fakeDynamoDB) TransactWriteItems(_ context.Context, input *dynamodb.TransactWriteItemsInput, _ ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {

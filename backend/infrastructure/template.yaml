@@ -327,6 +327,8 @@ Resources:
             TableName: !Ref UsersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref MoodEventsTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt NotificationQueue.QueueName
       Events:
         Api:
           Type: HttpApi
@@ -652,7 +654,8 @@ Resources:
   NotificationDeadLetterQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub '${ProjectName}-${Environment}-notifications-dlq'
+      QueueName: !Sub '${ProjectName}-${Environment}-notifications-dlq.fifo'
+      FifoQueue: true
       KmsMasterKeyId: alias/aws/sqs
       MessageRetentionPeriod: 1209600
       Tags:
@@ -666,7 +669,8 @@ Resources:
   NotificationQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub '${ProjectName}-${Environment}-notifications'
+      QueueName: !Sub '${ProjectName}-${Environment}-notifications.fifo'
+      FifoQueue: true
       KmsMasterKeyId: alias/aws/sqs
       VisibilityTimeout: 120
       RedrivePolicy:

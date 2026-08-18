@@ -6,6 +6,7 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	appconfig "github.com/dollhouse-app/dollhouse/backend/internal/config"
 )
 
@@ -16,5 +17,6 @@ func NewRuntimeHandlers(ctx context.Context, cfg appconfig.Config) (*Handlers, e
 		return nil, fmt.Errorf("load AWS configuration: %w", err)
 	}
 	store := NewDynamoDBStore(dynamodb.NewFromConfig(awsCfg), cfg.UsersTableName, cfg.FriendshipsTableName, cfg.MoodEventsTableName)
-	return NewHandlers(store), nil
+	publisher := NewSQSPublisher(sqs.NewFromConfig(awsCfg), cfg.NotificationQueueURL)
+	return NewHandlers(store, publisher), nil
 }

@@ -32,14 +32,15 @@ func (e *DomainError) Error() string { return e.Message }
 
 // Handlers implements the mood publishing and friend-status routes.
 type Handlers struct {
-	store Store
-	now   func() time.Time
-	newID func() (string, error)
+	store     Store
+	publisher NotificationPublisher
+	now       func() time.Time
+	newID     func() (string, error)
 }
 
 // NewHandlers creates handlers with production clock and identifier behavior.
-func NewHandlers(store Store) *Handlers {
-	return &Handlers{store: store, now: time.Now, newID: randomID}
+func NewHandlers(store Store, publisher NotificationPublisher) *Handlers {
+	return &Handlers{store: store, publisher: publisher, now: time.Now, newID: randomID}
 }
 
 type publishMoodRequest struct {
@@ -70,6 +71,18 @@ func (h *Handlers) PublishMood(ctx context.Context, request events.APIGatewayV2H
 	state.UpdatedAt = h.timestamp()
 	if err := h.store.PublishMood(ctx, userID, eventID, state); err != nil {
 		return h.failure("publish mood", err), nil
+	}
+	recipientIDs, err := h.store.ListNotificationRecipientIDs(ctx, userID)
+	if err != nil {
+		return internalError("list notification recipients", err), nil
+	}
+	job := NotificationJob{
+		SchemaVersion: 1, EventID: eventID, SenderUserID: userID,
+		RecipientUserIDs: recipientIDs, CorrelationID: correlationID(request, eventID),
+		CreatedAt: state.UpdatedAt,
+	}
+	if err := h.publisher.Publish(ctx, job); err != nil {
+		return internalError("publish notification job", err), nil
 	}
 	return response.JSON(http.StatusCreated, map[string]any{"data": map[string]any{"eventId": eventID, "status": state}})
 }
@@ -190,6 +203,18 @@ func internalError(operation string, err error) events.APIGatewayV2HTTPResponse 
 
 func (h *Handlers) timestamp() string {
 	return h.now().UTC().Truncate(time.Second).Format(time.RFC3339)
+}
+
+func correlationID(request events.APIGatewayV2HTTPRequest, fallback string) string {
+	for name, value := range request.Headers {
+		if strings.EqualFold(name, "x-correlation-id") && strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	if value := strings.TrimSpace(request.RequestContext.RequestID); value != "" {
+		return value
+	}
+	return fallback
 }
 
 func randomID() (string, error) {

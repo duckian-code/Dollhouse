@@ -69,6 +69,29 @@ sam deploy --parameter-overrides AlertEmail=team@example.com
 An SNS confirmation email must be accepted before alarm notifications are
 delivered. Use a distinct `Environment` parameter for additional stacks.
 
+### Mood notification jobs
+
+After `POST /moods` saves the user's current status and history event, the
+publisher resolves all accepted friend IDs and sends one versioned job to the
+notification FIFO queue:
+
+```json
+{
+  "schemaVersion": 1,
+  "eventId": "opaque-backend-event-id",
+  "senderUserId": "cognito-sub",
+  "recipientUserIds": ["friend-cognito-sub"],
+  "correlationId": "api-request-or-client-correlation-id",
+  "createdAt": "2026-08-18T16:00:00Z"
+}
+```
+
+Jobs contain identifiers only. Free-form mood text, disclosed slider values,
+and push tokens are deliberately excluded. The event ID is the FIFO
+deduplication ID, and jobs from one sender share a message group so their order
+is preserved. Failed deliveries are retried up to five receives before SQS
+moves them to the encrypted dead-letter queue.
+
 ### Cognito authorization verification
 
 The API uses the Cognito mobile client's audience and the user pool issuer for

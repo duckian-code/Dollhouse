@@ -24,6 +24,46 @@ type dynamodbAPI interface {
 	TransactWriteItems(context.Context, *dynamodb.TransactWriteItemsInput, ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error)
 }
 
+// ListNotificationRecipientIDs returns every accepted friend ID. DynamoDB may
+// return the same relationship more than once across retried pages, so IDs are
+// deduplicated before they enter a notification job.
+func (s *DynamoDBStore) ListNotificationRecipientIDs(ctx context.Context, userID string) ([]string, error) {
+	if s.friendshipsTable == "" {
+		return nil, errors.New("friendship table configuration is incomplete")
+	}
+	input := &dynamodb.QueryInput{
+		TableName: &s.friendshipsTable, IndexName: strptr(userStatusIndex),
+		KeyConditionExpression: strptr("userId = :userId AND begins_with(statusRelatedUserId, :status)"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":userId": &types.AttributeValueMemberS{Value: userID},
+			":status": &types.AttributeValueMemberS{Value: acceptedStatus + "#"},
+		},
+		ProjectionExpression: strptr("relatedUserId"),
+	}
+	seen := map[string]struct{}{}
+	recipients := make([]string, 0)
+	for {
+		output, err := s.client.Query(ctx, input)
+		if err != nil {
+			return nil, fmt.Errorf("query notification recipients: %w", err)
+		}
+		for _, item := range output.Items {
+			id, ok := stringAttribute(item["relatedUserId"])
+			if !ok || id == "" {
+				return nil, errors.New("accepted friendship has an invalid recipient ID")
+			}
+			if _, exists := seen[id]; !exists {
+				seen[id] = struct{}{}
+				recipients = append(recipients, id)
+			}
+		}
+		if len(output.LastEvaluatedKey) == 0 {
+			return recipients, nil
+		}
+		input.ExclusiveStartKey = output.LastEvaluatedKey
+	}
+}
+
 // DynamoDBStore persists mood events and joins accepted relationships to users.
 type DynamoDBStore struct {
 	client           dynamodbAPI
