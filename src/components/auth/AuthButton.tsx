@@ -24,7 +24,7 @@ export function AuthButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={tokens.color.white} />
+        <ActivityIndicator color={tokens.color.onAccent} />
       ) : (
         <Text style={styles.label}>{label}</Text>
       )}
@@ -41,5 +41,9 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.color.accent,
   },
   buttonMuted: { opacity: 0.75 },
-  label: { color: tokens.color.white, fontSize: 16, fontWeight: '700' },
+  label: {
+    color: tokens.color.onAccent,
+    fontFamily: tokens.typography.headingSemibold,
+    fontSize: 16,
+  },
 });

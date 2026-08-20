@@ -1,3 +1,10 @@
+import { CormorantGaramond_400Regular } from '@expo-google-fonts/cormorant-garamond/400Regular';
+import { CormorantGaramond_600SemiBold } from '@expo-google-fonts/cormorant-garamond/600SemiBold';
+import { CormorantGaramond_700Bold } from '@expo-google-fonts/cormorant-garamond/700Bold';
+import { Fraunces_400Regular } from '@expo-google-fonts/fraunces/400Regular';
+import { Fraunces_600SemiBold } from '@expo-google-fonts/fraunces/600SemiBold';
+import { Fraunces_700Bold } from '@expo-google-fonts/fraunces/700Bold';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -6,10 +13,21 @@ import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { tokens } from '@/theme/tokens';
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Fraunces_400Regular,
+    Fraunces_600SemiBold,
+    Fraunces_700Bold,
+    CormorantGaramond_400Regular,
+    CormorantGaramond_600SemiBold,
+    CormorantGaramond_700Bold,
+  });
+
+  if (!fontsLoaded) return <LoadingScreen label="Loading Dollhouse" />;
+
   return (
     <AuthProvider>
       <RootNavigator />
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
     </AuthProvider>
   );
 }
@@ -18,11 +36,7 @@ function RootNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <View accessibilityLabel="Restoring your session" style={styles.loading}>
-        <ActivityIndicator color={tokens.color.accent} size="large" />
-      </View>
-    );
+    return <LoadingScreen label="Restoring your session" />;
   }
 
   return (
@@ -46,6 +60,14 @@ function RootNavigator() {
         />
       </Stack.Protected>
     </Stack>
+  );
+}
+
+function LoadingScreen({ label }: { label: string }) {
+  return (
+    <View accessibilityLabel={label} style={styles.loading}>
+      <ActivityIndicator color={tokens.color.accent} size="large" />
+    </View>
   );
 }
 

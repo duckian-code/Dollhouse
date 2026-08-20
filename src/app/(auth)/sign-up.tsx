@@ -93,7 +93,16 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
-  hint: { marginTop: -8, color: tokens.color.textMuted, fontSize: 13 },
+  hint: {
+    marginTop: -8,
+    color: tokens.color.textMuted,
+    fontFamily: tokens.typography.bodyRegular,
+    fontSize: 15,
+  },
   link: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  linkText: { color: tokens.color.accent, fontSize: 15, fontWeight: '700' },
+  linkText: {
+    color: tokens.color.secondaryAccent,
+    fontFamily: tokens.typography.headingSemibold,
+    fontSize: 15,
+  },
 });

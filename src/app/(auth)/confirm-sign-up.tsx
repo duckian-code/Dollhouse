@@ -92,8 +92,13 @@ const styles = StyleSheet.create({
     borderRadius: tokens.radius.sm,
     backgroundColor: tokens.color.accentSoft,
     color: tokens.color.text,
-    fontSize: 14,
+    fontFamily: tokens.typography.bodySemibold,
+    fontSize: 16,
   },
   link: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  linkText: { color: tokens.color.accent, fontSize: 15, fontWeight: '700' },
+  linkText: {
+    color: tokens.color.secondaryAccent,
+    fontFamily: tokens.typography.headingSemibold,
+    fontSize: 15,
+  },
 });

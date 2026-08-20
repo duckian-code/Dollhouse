@@ -15,9 +15,12 @@ const styles = StyleSheet.create({
   message: {
     padding: tokens.spacing.md,
     borderRadius: tokens.radius.sm,
-    backgroundColor: '#F5DDD6',
-    color: '#7D2C1D',
-    fontSize: 14,
+    borderWidth: 1,
+    borderColor: tokens.color.secondaryAccent,
+    backgroundColor: tokens.color.surface,
+    color: tokens.color.secondaryAccent,
+    fontFamily: tokens.typography.bodySemibold,
+    fontSize: 16,
     lineHeight: 20,
   },
 });

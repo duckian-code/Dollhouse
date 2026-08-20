@@ -136,7 +136,7 @@ async function replaceMany(
   });
 }
 
-export const nativeCacheDatabase: CacheDatabase = {
+export const cacheDatabase: CacheDatabase = {
   initialize: migrate,
   getProfile: (accountId) => getOne('profile_cache', 'account_id', accountId),
   setProfile: (accountId, row) =>

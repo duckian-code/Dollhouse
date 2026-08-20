@@ -29,7 +29,11 @@ export function AuthTextField({ label, style, ...props }: AuthTextFieldProps) {
 
 const styles = StyleSheet.create({
   container: { gap: tokens.spacing.sm },
-  label: { color: tokens.color.text, fontSize: 14, fontWeight: '700' },
+  label: {
+    color: tokens.color.text,
+    fontFamily: tokens.typography.headingSemibold,
+    fontSize: 14,
+  },
   input: {
     minHeight: 52,
     paddingHorizontal: tokens.spacing.md,
@@ -38,6 +42,7 @@ const styles = StyleSheet.create({
     borderRadius: tokens.radius.md,
     backgroundColor: tokens.color.surface,
     color: tokens.color.text,
-    fontSize: 16,
+    fontFamily: tokens.typography.bodyRegular,
+    fontSize: 18,
   },
 });

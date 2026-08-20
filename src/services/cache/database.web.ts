@@ -26,7 +26,7 @@ function replace(
   );
 }
 
-export const webCacheDatabase: CacheDatabase = {
+export const cacheDatabase: CacheDatabase = {
   initialize: async () => undefined,
   getProfile: async (accountId) => profiles.get(accountId) ?? null,
   setProfile: async (accountId, row) => void profiles.set(accountId, row),

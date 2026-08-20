@@ -80,5 +80,9 @@ export default function SignInScreen() {
 
 const styles = StyleSheet.create({
   link: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  linkText: { color: tokens.color.accent, fontSize: 15, fontWeight: '700' },
+  linkText: {
+    color: tokens.color.secondaryAccent,
+    fontFamily: tokens.typography.headingSemibold,
+    fontSize: 15,
+  },
 });

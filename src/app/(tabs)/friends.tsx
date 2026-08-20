@@ -25,17 +25,22 @@ export default function FriendsScreen() {
 
 const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingVertical: tokens.spacing.xxl },
-  icon: { color: tokens.color.accent, fontSize: 50 },
+  icon: {
+    color: tokens.color.highlight,
+    fontFamily: tokens.typography.headingRegular,
+    fontSize: 50,
+  },
   title: {
     marginTop: tokens.spacing.md,
     color: tokens.color.text,
     fontSize: 19,
-    fontWeight: '700',
+    fontFamily: tokens.typography.headingBold,
   },
   body: {
     marginTop: tokens.spacing.sm,
     color: tokens.color.textMuted,
-    fontSize: 14,
+    fontFamily: tokens.typography.bodyRegular,
+    fontSize: 16,
     textAlign: 'center',
   },
 });

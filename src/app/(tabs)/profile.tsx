@@ -47,17 +47,22 @@ const styles = StyleSheet.create({
     borderRadius: tokens.radius.round,
     backgroundColor: tokens.color.accentSoft,
   },
-  avatarText: { color: tokens.color.accent, fontSize: 54 },
+  avatarText: {
+    color: tokens.color.highlight,
+    fontFamily: tokens.typography.headingRegular,
+    fontSize: 54,
+  },
   name: {
     marginTop: tokens.spacing.md,
     color: tokens.color.text,
     fontSize: 19,
-    fontWeight: '700',
+    fontFamily: tokens.typography.headingBold,
   },
   detail: {
     marginTop: tokens.spacing.sm,
     color: tokens.color.textMuted,
-    fontSize: 14,
+    fontFamily: tokens.typography.bodyRegular,
+    fontSize: 16,
     textAlign: 'center',
   },
   signOut: {
@@ -70,5 +75,9 @@ const styles = StyleSheet.create({
     borderRadius: tokens.radius.round,
   },
   pressed: { opacity: 0.7 },
-  signOutText: { color: tokens.color.accent, fontSize: 16, fontWeight: '700' },
+  signOutText: {
+    color: tokens.color.accent,
+    fontFamily: tokens.typography.headingBold,
+    fontSize: 16,
+  },
 });
