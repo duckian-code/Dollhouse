@@ -10,6 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
+import { MoodStatusProvider } from '@/providers/MoodStatusProvider';
 import { tokens } from '@/theme/tokens';
 
 export default function RootLayout() {
@@ -26,7 +27,9 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <RootNavigator />
+      <MoodStatusProvider>
+        <RootNavigator />
+      </MoodStatusProvider>
       <StatusBar style="light" />
     </AuthProvider>
   );
@@ -51,6 +54,8 @@ function RootNavigator() {
       </Stack.Protected>
       <Stack.Protected guard={isAuthenticated}>
         <Stack.Screen name="(tabs)" />
+      </Stack.Protected>
+      <Stack.Protected guard={__DEV__ || isAuthenticated}>
         <Stack.Screen
           name="check-in"
           options={{

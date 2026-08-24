@@ -4,9 +4,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { SectionHeader } from '@/components/SectionHeader';
+import { useMoodStatus } from '@/providers/MoodStatusProvider';
 import { tokens } from '@/theme/tokens';
 
 export default function HomeScreen() {
+  const { currentStatus } = useMoodStatus();
   return (
     <AppScreen>
       <SectionHeader
@@ -20,9 +22,19 @@ export default function HomeScreen() {
       <View style={styles.cards}>
         <AppCard style={styles.summaryCard}>
           <Text style={styles.eyebrow}>RECENT MOOD</Text>
-          <Text style={styles.cardTitle}>Ready to check in</Text>
+          <Text style={styles.cardTitle}>
+            {currentStatus?.status ?? 'Ready to check in'}
+          </Text>
           <Text style={styles.cardBody}>
-            Track how you feel and notice patterns over time.
+            {currentStatus
+              ? `Updated ${new Date(currentStatus.updatedAt).toLocaleTimeString(
+                  [],
+                  {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  },
+                )}`
+              : 'Track how you feel and notice patterns over time.'}
           </Text>
         </AppCard>
         <AppCard style={styles.summaryCard}>
