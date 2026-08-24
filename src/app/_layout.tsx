@@ -59,6 +59,12 @@ function RootNavigator() {
           }}
         />
       </Stack.Protected>
+      <Stack.Protected guard={__DEV__ || isAuthenticated}>
+        <Stack.Screen
+          name="avatar-customization"
+          options={{ animation: 'slide_from_right' }}
+        />
+      </Stack.Protected>
     </Stack>
   );
 }

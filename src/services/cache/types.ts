@@ -17,8 +17,3 @@ export interface CacheRecord<T> {
   cachedAtMs: number;
   expiresAtMs: number;
 }
-
-export interface AssetCatalogItem {
-  assetId: string;
-  [key: string]: unknown;
-}
