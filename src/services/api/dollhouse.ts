@@ -1,5 +1,6 @@
 import { apiRequest } from '@/services/api/client';
 import type {
+  AvatarCatalogResponse,
   DollConfigurationResponse,
   FriendRequestResponse,
   FriendRequestsResponse,
@@ -33,6 +34,10 @@ export function updateProfile(request: UpdateProfileRequest) {
 
 export function getDollConfiguration() {
   return apiRequest<DollConfigurationResponse>('/doll');
+}
+
+export function getAvatarCatalog() {
+  return apiRequest<AvatarCatalogResponse>('/assets/catalog');
 }
 
 export function updateDollConfiguration(

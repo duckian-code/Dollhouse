@@ -1,3 +1,4 @@
+import { Link } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/AppCard';
@@ -24,8 +25,18 @@ export default function ProfileScreen() {
           <Text style={styles.avatarText}>○</Text>
         </View>
         <Text style={styles.name}>Dollhouse resident</Text>
-        <Text style={styles.detail}>Profile customization is coming soon.</Text>
+        <Text style={styles.detail}>
+          Make your Dollhouse resident your own.
+        </Text>
       </AppCard>
+      <Link href="/avatar-customization" asChild>
+        <Pressable
+          accessibilityRole="link"
+          style={({ pressed }) => [styles.customize, pressed && styles.pressed]}
+        >
+          <Text style={styles.customizeText}>Customize doll</Text>
+        </Pressable>
+      </Link>
       <Pressable
         accessibilityRole="button"
         onPress={logout}
@@ -73,6 +84,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: tokens.color.accent,
     borderRadius: tokens.radius.round,
+  },
+  customize: {
+    minHeight: 52,
+    marginTop: tokens.spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: tokens.radius.round,
+    backgroundColor: tokens.color.accent,
+  },
+  customizeText: {
+    color: tokens.color.onAccent,
+    fontFamily: tokens.typography.headingBold,
+    fontSize: 16,
   },
   pressed: { opacity: 0.7 },
   signOutText: {

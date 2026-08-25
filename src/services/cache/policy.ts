@@ -6,7 +6,7 @@ export const cacheTtlMs: Record<CacheDomain, number> = {
   recentStatus: 5 * MINUTE,
   friendSummary: 15 * MINUTE,
   profile: 30 * MINUTE,
-  assetCatalog: 24 * 60 * MINUTE,
+  assetCatalog: 15 * MINUTE,
 };
 
 export function expiresAt(domain: CacheDomain, cachedAtMs: number) {

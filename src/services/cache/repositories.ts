@@ -1,11 +1,12 @@
 import { cacheDatabase } from '@/services/cache/database';
 import { expiresAt } from '@/services/cache/policy';
+import type { CachedResult, CacheRecord } from '@/services/cache/types';
 import type {
-  AssetCatalogItem,
-  CachedResult,
-  CacheRecord,
-} from '@/services/cache/types';
-import type { FriendStatus, Profile, UserSummary } from '@/types/api';
+  AvatarCatalog,
+  FriendStatus,
+  Profile,
+  UserSummary,
+} from '@/types/api';
 
 const ASSET_CATALOG_KEY = 'default';
 
@@ -58,17 +59,32 @@ export async function cacheProfile(accountId: string, profile: Profile) {
 }
 
 export async function readCachedAssetCatalog() {
-  const record = deserialize<AssetCatalogItem[]>(
+  const record = deserialize<AvatarCatalog>(
     await cacheDatabase.getAssetCatalog(ASSET_CATALOG_KEY),
   );
-  return record ? result(record) : null;
+  return record && isAvatarCatalog(record.value) ? result(record) : null;
 }
 
-export async function cacheAssetCatalog(items: AssetCatalogItem[]) {
-  await cacheDatabase.setAssetCatalog(
-    ASSET_CATALOG_KEY,
-    serialize('assetCatalog', items),
+function isAvatarCatalog(value: AvatarCatalog) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof value.catalogVersion === 'string' &&
+    typeof value.expiresAt === 'string' &&
+    Array.isArray(value.assets)
   );
+}
+
+export async function cacheAssetCatalog(catalog: AvatarCatalog) {
+  const cachedAtMs = Date.now();
+  const serverExpiryMs = Date.parse(catalog.expiresAt);
+  await cacheDatabase.setAssetCatalog(ASSET_CATALOG_KEY, {
+    payloadJson: JSON.stringify(catalog),
+    cachedAtMs,
+    expiresAtMs: Number.isFinite(serverExpiryMs)
+      ? serverExpiryMs
+      : expiresAt('assetCatalog', cachedAtMs),
+  });
 }
 
 export async function readCachedFriendSummaries(accountId: string) {

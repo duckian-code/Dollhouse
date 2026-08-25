@@ -2,6 +2,24 @@ export type ISODateTime = string;
 export type UserId = string;
 export type AssetId = string;
 
+export type AssetCategory =
+  'body' | 'hair' | 'eyes' | 'nose' | 'mouth' | 'clothing';
+
+export interface AvatarAsset {
+  assetId: AssetId;
+  category: AssetCategory;
+  url: string;
+  contentType: 'image/png';
+  width: number;
+  height: number;
+}
+
+export interface AvatarCatalog {
+  catalogVersion: string;
+  expiresAt: ISODateTime;
+  assets: AvatarAsset[];
+}
+
 export interface ApiResponse<T> {
   data: T;
 }
@@ -101,6 +119,7 @@ export interface FriendStatus {
 export type FriendStatusesResponse = PaginatedResponse<FriendStatus>;
 
 export type ProfileResponse = ApiResponse<{ profile: Profile }>;
+export type AvatarCatalogResponse = ApiResponse<AvatarCatalog>;
 export type DollConfigurationResponse = ApiResponse<{
   configuration: DollConfiguration;
 }>;

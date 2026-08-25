@@ -1,6 +1,7 @@
 import {
   acceptFriendRequest,
   declineFriendRequest,
+  getAvatarCatalog,
   getFriendStatuses,
   getProfile,
   removeFriend,
@@ -10,16 +11,19 @@ import {
 import { getCurrentAccountId } from '@/services/auth/cognito';
 import {
   cacheFriendSummaries,
+  cacheAssetCatalog,
   cacheProfile,
   cacheRecentStatuses,
   clearFriendCache,
   readCachedFriendSummaries,
+  readCachedAssetCatalog,
   readCachedProfile,
   readCachedRecentStatuses,
 } from '@/services/cache/repositories';
 import type { CachedResult } from '@/services/cache/types';
 import type {
   FriendStatus,
+  AvatarCatalog,
   Profile,
   SendFriendRequestRequest,
   UpdateProfileRequest,
@@ -46,6 +50,17 @@ export async function loadProfile(): Promise<CacheThenNetwork<Profile>> {
   const refresh = getProfile().then(async ({ data }) => {
     await cacheProfile(accountId, data.profile);
     return networkResult(data.profile);
+  });
+  return { cached, refresh };
+}
+
+export async function loadAvatarCatalog(): Promise<
+  CacheThenNetwork<AvatarCatalog>
+> {
+  const cached = await readCachedAssetCatalog();
+  const refresh = getAvatarCatalog().then(async ({ data }) => {
+    await cacheAssetCatalog(data);
+    return networkResult(data);
   });
   return { cached, refresh };
 }
