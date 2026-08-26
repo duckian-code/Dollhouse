@@ -1,0 +1,21 @@
+version = 0.1
+
+[default.global.parameters]
+region = "us-east-2"
+
+[default.build.parameters]
+template_file = "infrastructure/template.yaml"
+parallel = true
+
+[default.validate.parameters]
+template_file = "infrastructure/template.yaml"
+lint = true
+
+[default.deploy.parameters]
+stack_name = "dollhouse-dev"
+resolve_s3 = true
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+fail_on_empty_changeset = false
+parameter_overrides = "Environment=dev ProjectName=dollhouse"
+tags = "Project=dollhouse Environment=dev ManagedBy=AWS-SAM"
