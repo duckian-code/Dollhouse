@@ -11,6 +11,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { FriendManagementProvider } from '@/providers/FriendManagementProvider';
+import { FriendStatusFeedProvider } from '@/providers/FriendStatusFeedProvider';
 import { MoodStatusProvider } from '@/providers/MoodStatusProvider';
 import { tokens } from '@/theme/tokens';
 
@@ -30,7 +31,9 @@ export default function RootLayout() {
     <AuthProvider>
       <MoodStatusProvider>
         <FriendManagementProvider>
-          <RootNavigator />
+          <FriendStatusFeedProvider>
+            <RootNavigator />
+          </FriendStatusFeedProvider>
         </FriendManagementProvider>
       </MoodStatusProvider>
       <StatusBar style="light" />
