@@ -10,6 +10,11 @@ import {
 
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
+import {
+  EmptyStateMessage,
+  LoadingState,
+  RetryState,
+} from '@/components/AsyncState';
 import { FriendStatusCard } from '@/components/friends/FriendStatusCard';
 import { SectionHeader } from '@/components/SectionHeader';
 import { useFriendStatusFeed } from '@/providers/FriendStatusFeedProvider';
@@ -96,19 +101,15 @@ export default function HomeScreen() {
       ) : null}
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
       {error ? (
-        <View accessibilityLiveRegion="assertive" style={styles.errorState}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable accessibilityRole="button" onPress={() => void refresh()}>
-            <Text style={styles.retry}>Try again</Text>
-          </Pressable>
-        </View>
+        <RetryState
+          message={error}
+          onRetry={() => void refresh()}
+          retrying={isRefreshing}
+        />
       ) : null}
 
       {isInitialLoading && !statuses.length ? (
-        <View style={styles.loadingState}>
-          <ActivityIndicator color={tokens.color.accent} size="large" />
-          <Text style={styles.cardBody}>Opening your friends’ rooms…</Text>
-        </View>
+        <LoadingState label="Opening your friends’ rooms…" />
       ) : statuses.length ? (
         <View style={styles.feed}>
           {statuses.map((item) => (
@@ -121,10 +122,10 @@ export default function HomeScreen() {
         </View>
       ) : (
         <AppCard style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>No friends at home yet</Text>
-          <Text style={styles.cardBody}>
-            Accepted friends and their latest shared moods will appear here.
-          </Text>
+          <EmptyStateMessage
+            detail="Accepted friends and their latest shared moods will appear here."
+            title="No friends at home yet"
+          />
         </AppCard>
       )}
     </AppScreen>
@@ -216,33 +217,6 @@ const styles = StyleSheet.create({
     fontFamily: tokens.typography.bodySemibold,
     fontSize: 15,
   },
-  errorState: {
-    marginTop: tokens.spacing.md,
-    padding: tokens.spacing.md,
-    borderWidth: 1,
-    borderColor: tokens.color.secondaryAccent,
-    borderRadius: tokens.radius.sm,
-  },
-  errorText: {
-    color: tokens.color.secondaryAccent,
-    fontFamily: tokens.typography.bodySemibold,
-    fontSize: 15,
-  },
-  retry: {
-    marginTop: tokens.spacing.sm,
-    color: tokens.color.accent,
-    fontFamily: tokens.typography.headingBold,
-  },
-  loadingState: {
-    minHeight: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   feed: { gap: tokens.spacing.md, marginTop: tokens.spacing.md },
   emptyState: { marginTop: tokens.spacing.md, alignItems: 'center' },
-  emptyTitle: {
-    color: tokens.color.text,
-    fontFamily: tokens.typography.headingBold,
-    fontSize: 19,
-  },
 });

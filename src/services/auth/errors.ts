@@ -11,7 +11,14 @@ const authMessages: Record<string, string> = {
 
 export function getAuthErrorMessage(error: unknown) {
   if (error instanceof Error) {
-    return authMessages[error.name] ?? error.message;
+    if (authMessages[error.name]) return authMessages[error.name];
+    if (error.name === 'NetworkError' || error instanceof TypeError) {
+      return 'You appear to be offline. Check your connection and try again.';
+    }
+    if (error.message.includes('not configured')) {
+      return 'Sign-in is temporarily unavailable because authentication has not been configured.';
+    }
+    return 'We could not complete that request. Please try again.';
   }
   return 'Something went wrong. Please try again.';
 }

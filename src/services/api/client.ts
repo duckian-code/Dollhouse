@@ -1,5 +1,9 @@
 import { environment } from '@/config/environment';
 import { getAccessToken } from '@/services/auth/cognito';
+import {
+  notifyConnection,
+  notifySessionExpired,
+} from '@/services/resilience/events';
 import type { ErrorResponse } from '@/types/api';
 
 export function createApiUrl(path: string): URL {
@@ -42,7 +46,18 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}) {
   headers.set('Content-Type', 'application/json');
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
 
-  const response = await fetch(createApiUrl(path), { ...init, headers });
+  let response: Response;
+  try {
+    response = await fetch(createApiUrl(path), { ...init, headers });
+    notifyConnection('online');
+  } catch {
+    notifyConnection('offline');
+    throw new ApiError(
+      0,
+      'network_unavailable',
+      'You appear to be offline. Check your connection and try again.',
+    );
+  }
   if (response.status === 204) return undefined as T;
 
   const text = await response.text();
@@ -54,6 +69,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}) {
   }
 
   if (!response.ok) {
+    if (response.status === 401) void notifySessionExpired();
     if (isErrorResponse(body)) {
       throw new ApiError(response.status, body.error.code, body.error.message);
     }

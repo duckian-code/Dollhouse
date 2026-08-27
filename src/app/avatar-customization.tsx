@@ -26,6 +26,7 @@ import {
   unavailableDraftIds,
 } from '@/services/avatar/catalog';
 import { loadAvatarCatalog } from '@/services/cache/dollhouse';
+import { getUserFacingError } from '@/services/resilience/errors';
 import { tokens } from '@/theme/tokens';
 import type {
   AssetCategory,
@@ -106,9 +107,7 @@ export default function AvatarCustomizationScreen() {
       setInitialDraft(restoredDraft);
     } catch (caught) {
       setError(
-        caught instanceof Error
-          ? caught.message
-          : 'The avatar editor could not be loaded.',
+        getUserFacingError(caught, 'The avatar editor could not be loaded.'),
       );
     } finally {
       setLoading(false);
@@ -167,9 +166,10 @@ export default function AvatarCustomizationScreen() {
       setNotice('Your doll customization was saved.');
     } catch (caught) {
       setError(
-        caught instanceof Error
-          ? caught.message
-          : 'Your customization could not be saved.',
+        getUserFacingError(
+          caught,
+          'Your customization could not be saved. Please try again.',
+        ),
       );
     } finally {
       setSaving(false);

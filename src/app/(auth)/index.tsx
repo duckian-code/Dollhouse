@@ -13,7 +13,7 @@ import { tokens } from '@/theme/tokens';
 
 export default function SignInScreen() {
   const params = useLocalSearchParams<{ email?: string }>();
-  const { login } = useAuth();
+  const { login, sessionMessage } = useAuth();
   const [email, setEmail] = useState(params.email ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(
@@ -24,6 +24,7 @@ export default function SignInScreen() {
   const [loading, setLoading] = useState(false);
 
   async function handleSignIn() {
+    if (loading) return;
     if (!email.trim() || !password) {
       setError('Enter your email and password.');
       return;
@@ -48,7 +49,7 @@ export default function SignInScreen() {
 
   return (
     <AuthShell title="Welcome home" subtitle="Sign in to visit your Dollhouse.">
-      <AuthMessage>{error}</AuthMessage>
+      <AuthMessage>{error || sessionMessage || ''}</AuthMessage>
       <AuthTextField
         autoCapitalize="none"
         autoComplete="email"

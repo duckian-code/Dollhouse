@@ -19,8 +19,10 @@ export default function ConfirmSignUpScreen() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
 
   async function handleConfirm() {
+    if (loading) return;
     if (!code.trim()) {
       setError('Enter the confirmation code from your email.');
       return;
@@ -38,6 +40,8 @@ export default function ConfirmSignUpScreen() {
   }
 
   async function handleResend() {
+    if (resending) return;
+    setResending(true);
     setError('');
     setNotice('');
     try {
@@ -45,6 +49,8 @@ export default function ConfirmSignUpScreen() {
       setNotice('A new code was sent to your email.');
     } catch (caught) {
       setError(getAuthErrorMessage(caught));
+    } finally {
+      setResending(false);
     }
   }
 
@@ -77,10 +83,14 @@ export default function ConfirmSignUpScreen() {
       />
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ busy: resending, disabled: resending }}
+        disabled={resending}
         onPress={handleResend}
         style={styles.link}
       >
-        <Text style={styles.linkText}>Send a new code</Text>
+        <Text style={styles.linkText}>
+          {resending ? 'Sending…' : 'Send a new code'}
+        </Text>
       </Pressable>
     </AuthShell>
   );

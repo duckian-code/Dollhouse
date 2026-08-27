@@ -9,10 +9,12 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { ApplicationBanner } from '@/components/ApplicationBanner';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { FriendManagementProvider } from '@/providers/FriendManagementProvider';
 import { FriendStatusFeedProvider } from '@/providers/FriendStatusFeedProvider';
 import { MoodStatusProvider } from '@/providers/MoodStatusProvider';
+import { ResilienceProvider } from '@/providers/ResilienceProvider';
 import { tokens } from '@/theme/tokens';
 
 export default function RootLayout() {
@@ -28,16 +30,19 @@ export default function RootLayout() {
   if (!fontsLoaded) return <LoadingScreen label="Loading Dollhouse" />;
 
   return (
-    <AuthProvider>
-      <MoodStatusProvider>
-        <FriendManagementProvider>
-          <FriendStatusFeedProvider>
-            <RootNavigator />
-          </FriendStatusFeedProvider>
-        </FriendManagementProvider>
-      </MoodStatusProvider>
-      <StatusBar style="light" />
-    </AuthProvider>
+    <ResilienceProvider>
+      <AuthProvider>
+        <ApplicationBanner />
+        <MoodStatusProvider>
+          <FriendManagementProvider>
+            <FriendStatusFeedProvider>
+              <RootNavigator />
+            </FriendStatusFeedProvider>
+          </FriendManagementProvider>
+        </MoodStatusProvider>
+        <StatusBar style="light" />
+      </AuthProvider>
+    </ResilienceProvider>
   );
 }
 

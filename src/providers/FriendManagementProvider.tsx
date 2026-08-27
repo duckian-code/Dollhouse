@@ -17,6 +17,7 @@ import {
   sendFriendRequestAndRefresh,
 } from '@/services/cache/dollhouse';
 import type { FriendRequest, UserSummary } from '@/types/api';
+import { getUserFacingError } from '@/services/resilience/errors';
 
 const previewUsers: UserSummary[] = [
   { userId: 'preview-alex', username: 'alexj', displayName: 'Alex Johnson' },
@@ -56,9 +57,7 @@ const FriendManagementContext =
   createContext<FriendManagementContextValue | null>(null);
 
 function messageFrom(caught: unknown) {
-  return caught instanceof Error
-    ? caught.message
-    : 'Something went wrong. Please try again.';
+  return getUserFacingError(caught);
 }
 
 export function FriendManagementProvider({ children }: PropsWithChildren) {

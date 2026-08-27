@@ -18,6 +18,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useMoodStatus } from '@/providers/MoodStatusProvider';
 import { publishMood } from '@/services/api/dollhouse';
 import { isCatalogMood, moodCatalog } from '@/services/moods/catalog';
+import { getUserFacingError } from '@/services/resilience/errors';
 import { tokens } from '@/theme/tokens';
 import type { MoodState, PublishMoodRequest } from '@/types/api';
 
@@ -97,9 +98,10 @@ export default function CheckInScreen() {
     } catch (caught) {
       setShowConfirmation(false);
       setError(
-        caught instanceof Error
-          ? caught.message
-          : 'Your check-in could not be published. Please try again.',
+        getUserFacingError(
+          caught,
+          'Your check-in could not be published. Please try again.',
+        ),
       );
     } finally {
       setIsSubmitting(false);

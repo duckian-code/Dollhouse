@@ -18,6 +18,7 @@ export default function SignUpScreen() {
   const [loading, setLoading] = useState(false);
 
   async function handleSignUp() {
+    if (loading) return;
     if (!email.trim() || !password || !confirmPassword) {
       setError('Complete all fields to create your account.');
       return;

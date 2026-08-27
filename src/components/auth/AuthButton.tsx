@@ -16,6 +16,7 @@ export function AuthButton({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ busy: loading, disabled: loading }}
       disabled={loading}
       onPress={onPress}
       style={({ pressed }) => [

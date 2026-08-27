@@ -15,6 +15,7 @@ import {
   loadRecentStatuses,
 } from '@/services/cache/dollhouse';
 import type { AvatarCatalog, FriendStatus } from '@/types/api';
+import { getUserFacingError } from '@/services/resilience/errors';
 
 const previewStatuses: FriendStatus[] = [
   {
@@ -74,9 +75,10 @@ const FriendStatusFeedContext =
   createContext<FriendStatusFeedContextValue | null>(null);
 
 function errorMessage(caught: unknown) {
-  return caught instanceof Error
-    ? caught.message
-    : 'Friend statuses could not be refreshed.';
+  return getUserFacingError(
+    caught,
+    'Friend statuses could not be refreshed. Please try again.',
+  );
 }
 
 export function FriendStatusFeedProvider({ children }: PropsWithChildren) {

@@ -19,10 +19,12 @@ import {
   initializeCache,
   pruneExpiredCache,
 } from '@/services/cache/repositories';
+import { subscribeToSessionExpiration } from '@/services/resilience/events';
 
 type AuthContextValue = {
   isAuthenticated: boolean;
   isLoading: boolean;
+  sessionMessage: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -32,6 +34,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: PropsWithChildren) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionMessage, setSessionMessage] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([initializeCache(), hasAuthenticatedUser()])
@@ -42,12 +45,33 @@ export function AuthProvider({ children }: PropsWithChildren) {
       .finally(() => setIsLoading(false));
   }, []);
 
+  useEffect(
+    () =>
+      subscribeToSessionExpiration(async () => {
+        try {
+          const accountId = await getCurrentAccountId();
+          await clearAccountCache(accountId);
+        } catch {
+          // An expired token can also make account lookup unavailable.
+        }
+        try {
+          await cognitoLogout();
+        } catch {
+          // Local navigation should still recover even if remote sign-out fails.
+        }
+        setIsAuthenticated(false);
+        setSessionMessage('Your session expired. Please sign in again.');
+      }),
+    [],
+  );
+
   const login = useCallback(async (email: string, password: string) => {
     const result = await cognitoLogin(email, password);
     if (!result.isSignedIn) {
       throw new Error('Additional sign-in verification is required.');
     }
     setIsAuthenticated(true);
+    setSessionMessage(null);
   }, []);
 
   const logout = useCallback(async () => {
@@ -58,8 +82,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const value = useMemo(
-    () => ({ isAuthenticated, isLoading, login, logout }),
-    [isAuthenticated, isLoading, login, logout],
+    () => ({ isAuthenticated, isLoading, sessionMessage, login, logout }),
+    [isAuthenticated, isLoading, sessionMessage, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

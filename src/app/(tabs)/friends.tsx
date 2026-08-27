@@ -1,7 +1,6 @@
 import { router, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Modal,
   Pressable,
   RefreshControl,
@@ -12,6 +11,7 @@ import {
 
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
+import { LoadingState, RetryState } from '@/components/AsyncState';
 import { FriendRow } from '@/components/friends/FriendRow';
 import { SectionHeader } from '@/components/SectionHeader';
 import { useFriendManagement } from '@/providers/FriendManagementProvider';
@@ -64,12 +64,11 @@ export default function FriendsScreen() {
         </Text>
       ) : null}
       {error ? (
-        <View accessibilityLiveRegion="assertive" style={styles.errorState}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable accessibilityRole="button" onPress={() => void refresh()}>
-            <Text style={styles.retryText}>Try again</Text>
-          </Pressable>
-        </View>
+        <RetryState
+          message={error}
+          onRetry={() => void refresh()}
+          retrying={isLoading}
+        />
       ) : null}
       <View accessibilityRole="tablist" style={styles.tabs}>
         <TabButton
@@ -92,7 +91,7 @@ export default function FriendsScreen() {
       </Pressable>
 
       {isLoading && !friends.length && !incoming.length ? (
-        <ActivityIndicator color={tokens.color.accent} style={styles.loader} />
+        <LoadingState label="Opening your friends list…" />
       ) : view === 'friends' ? (
         <AppCard>
           <Text style={styles.sectionTitle}>Accepted friends</Text>
