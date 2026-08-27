@@ -13,12 +13,14 @@ import { tokens } from '@/theme/tokens';
 type AppScreenProps = PropsWithChildren<{
   scroll?: boolean;
   contentContainerStyle?: ScrollViewProps['contentContainerStyle'];
+  refreshControl?: ScrollViewProps['refreshControl'];
 }> &
   ViewProps;
 
 export function AppScreen({
   children,
   contentContainerStyle,
+  refreshControl,
   scroll = true,
   style,
   ...viewProps
@@ -28,6 +30,7 @@ export function AppScreen({
       {scroll ? (
         <ScrollView
           contentContainerStyle={[styles.content, contentContainerStyle]}
+          refreshControl={refreshControl}
           showsVerticalScrollIndicator={false}
         >
           {children}
