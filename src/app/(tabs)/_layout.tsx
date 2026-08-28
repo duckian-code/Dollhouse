@@ -65,6 +65,10 @@ const styles = StyleSheet.create({
     borderTopColor: tokens.color.border,
     backgroundColor: tokens.color.surface,
   },
-  label: { fontSize: 12, fontWeight: '600' },
-  icon: { fontSize: 24, lineHeight: 26 },
+  label: { fontFamily: tokens.typography.headingSemibold, fontSize: 12 },
+  icon: {
+    fontFamily: tokens.typography.headingRegular,
+    fontSize: 24,
+    lineHeight: 26,
+  },
 });

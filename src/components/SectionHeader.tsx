@@ -23,13 +23,14 @@ const styles = StyleSheet.create({
   title: {
     color: tokens.color.text,
     fontSize: tokens.typography.title,
-    fontWeight: '700',
+    fontFamily: tokens.typography.headingBold,
     letterSpacing: -0.6,
   },
   subtitle: {
     marginTop: tokens.spacing.xs,
     color: tokens.color.textMuted,
     fontSize: tokens.typography.body,
+    fontFamily: tokens.typography.bodyRegular,
     lineHeight: 23,
   },
 });

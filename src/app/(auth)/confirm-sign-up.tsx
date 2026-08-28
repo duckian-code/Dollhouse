@@ -1,0 +1,114 @@
+import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text } from 'react-native';
+
+import { AuthButton } from '@/components/auth/AuthButton';
+import { AuthMessage } from '@/components/auth/AuthMessage';
+import { AuthShell } from '@/components/auth/AuthShell';
+import { AuthTextField } from '@/components/auth/AuthTextField';
+import {
+  confirmRegistration,
+  resendRegistrationCode,
+} from '@/services/auth/cognito';
+import { getAuthErrorMessage } from '@/services/auth/errors';
+import { tokens } from '@/theme/tokens';
+
+export default function ConfirmSignUpScreen() {
+  const { email = '' } = useLocalSearchParams<{ email?: string }>();
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  async function handleConfirm() {
+    if (loading) return;
+    if (!code.trim()) {
+      setError('Enter the confirmation code from your email.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await confirmRegistration(email, code);
+      router.replace({ pathname: '/', params: { email } });
+    } catch (caught) {
+      setError(getAuthErrorMessage(caught));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    if (resending) return;
+    setResending(true);
+    setError('');
+    setNotice('');
+    try {
+      await resendRegistrationCode(email);
+      setNotice('A new code was sent to your email.');
+    } catch (caught) {
+      setError(getAuthErrorMessage(caught));
+    } finally {
+      setResending(false);
+    }
+  }
+
+  return (
+    <AuthShell
+      title="Check your email"
+      subtitle={`Enter the confirmation code sent to ${email || 'your email'}.`}
+    >
+      <AuthMessage>{error}</AuthMessage>
+      {notice ? (
+        <Text accessibilityLiveRegion="polite" style={styles.notice}>
+          {notice}
+        </Text>
+      ) : null}
+      <AuthTextField
+        autoComplete="one-time-code"
+        inputMode="numeric"
+        label="Confirmation code"
+        maxLength={6}
+        onChangeText={setCode}
+        onSubmitEditing={handleConfirm}
+        placeholder="123456"
+        returnKeyType="done"
+        value={code}
+      />
+      <AuthButton
+        label="Confirm email"
+        loading={loading}
+        onPress={handleConfirm}
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ busy: resending, disabled: resending }}
+        disabled={resending}
+        onPress={handleResend}
+        style={styles.link}
+      >
+        <Text style={styles.linkText}>
+          {resending ? 'Sending…' : 'Send a new code'}
+        </Text>
+      </Pressable>
+    </AuthShell>
+  );
+}
+
+const styles = StyleSheet.create({
+  notice: {
+    padding: tokens.spacing.md,
+    borderRadius: tokens.radius.sm,
+    backgroundColor: tokens.color.accentSoft,
+    color: tokens.color.text,
+    fontFamily: tokens.typography.bodySemibold,
+    fontSize: 16,
+  },
+  link: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  linkText: {
+    color: tokens.color.secondaryAccent,
+    fontFamily: tokens.typography.headingSemibold,
+    fontSize: 15,
+  },
+});

@@ -32,10 +32,15 @@ export default function MoodsScreen() {
 
 const styles = StyleSheet.create({
   list: { gap: tokens.spacing.md },
-  title: { color: tokens.color.text, fontSize: 17, fontWeight: '700' },
+  title: {
+    color: tokens.color.text,
+    fontFamily: tokens.typography.headingBold,
+    fontSize: 17,
+  },
   detail: {
     marginTop: tokens.spacing.xs,
     color: tokens.color.textMuted,
-    fontSize: 14,
+    fontFamily: tokens.typography.bodyRegular,
+    fontSize: 16,
   },
 });
