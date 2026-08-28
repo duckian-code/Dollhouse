@@ -7,7 +7,7 @@ repository currently contains the mobile application foundation for Trello ticke
 
 - Node.js 22 LTS or newer
 - npm 10 or newer
-- Expo Go for quick device smoke tests
+- An Expo development build for device authentication tests
 - Android Studio for local Android development builds
 - Xcode on macOS for local iOS development builds
 
@@ -19,15 +19,19 @@ cp .env.example .env
 npm start
 ```
 
-The Expo development server will show options for opening the app on Android, iOS, web, or a
-physical device. If a phone needs to reach a backend running on your computer, replace
-`localhost` in `.env` with your computer's LAN IP address.
+The example environment targets the shared deployed development backend. The Expo development
+server will show options for opening the app on Android, iOS, web, or a physical device.
+
+AWS Amplify authentication depends on native modules that are unavailable in Expo Go. Test login
+in the web build or install an Expo development build on the device.
 
 ## Environment variables
 
-| Variable              | Purpose                      | Default                 |
-| --------------------- | ---------------------------- | ----------------------- |
-| `EXPO_PUBLIC_API_URL` | Base URL for the backend API | `http://localhost:3000` |
+| Variable                                  | Purpose                       |
+| ----------------------------------------- | ----------------------------- |
+| `EXPO_PUBLIC_API_URL`                     | Base URL for the backend API  |
+| `EXPO_PUBLIC_COGNITO_USER_POOL_ID`        | Cognito user pool identifier  |
+| `EXPO_PUBLIC_COGNITO_USER_POOL_CLIENT_ID` | Cognito application client ID |
 
 Variables prefixed with `EXPO_PUBLIC_` are included in the client application bundle. Never use
 them for passwords, private API keys, signing keys, or other secrets. Local `.env` files are

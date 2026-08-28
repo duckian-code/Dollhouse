@@ -34,6 +34,13 @@ export default function SignInScreen() {
     try {
       await login(email, password);
     } catch (caught) {
+      if (__DEV__) {
+        const details =
+          caught instanceof Error
+            ? { name: caught.name, message: caught.message }
+            : { name: 'UnknownError' };
+        console.warn('Cognito sign-in failed.', details);
+      }
       const message = getAuthErrorMessage(caught);
       setError(message);
       if (
