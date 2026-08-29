@@ -92,6 +92,19 @@ deduplication ID, and jobs from one sender share a message group so their order
 is preserved. Failed deliveries are retried up to five receives before SQS
 moves them to the encrypted dead-letter queue.
 
+The notification consumer queries enabled records in the Devices table and
+sends a generic, non-sensitive notification through Expo Push Service. Expo
+requests are capped at 100 messages, invalid (`DeviceNotRegistered`) records
+are disabled conditionally, and transient or configuration failures are
+reported to Lambda as partial SQS batch failures. Lifecycle logs record only
+job identifiers and aggregate attempt outcomes; they never include push tokens
+or mood contents. If Expo enhanced push security is enabled, deploy with
+`ExpoPushAccessToken` set to the project access token.
+
+The mobile application must separately obtain Expo push tokens and register or
+remove Devices records. Those authenticated device endpoints are outside the
+consumer Lambda's scope and remain undefined in the current API contract.
+
 ### Cognito authorization verification
 
 The API uses the Cognito mobile client's audience and the user pool issuer for

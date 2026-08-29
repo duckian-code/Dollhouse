@@ -21,6 +21,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 func TestLoadReadsEnvironment(t *testing.T) {
 	t.Setenv("USERS_TABLE_NAME", "users-test")
 	t.Setenv("NOTIFICATION_QUEUE_URL", "https://example.test/queue")
+	t.Setenv("EXPO_PUSH_ACCESS_TOKEN", "expo-secret")
 	t.Setenv("ASSET_CATALOG_KEY", "catalog/test.json")
 
 	got := Load()
@@ -29,6 +30,9 @@ func TestLoadReadsEnvironment(t *testing.T) {
 	}
 	if got.NotificationQueueURL != "https://example.test/queue" {
 		t.Fatalf("NotificationQueueURL = %q, want test URL", got.NotificationQueueURL)
+	}
+	if got.ExpoPushAccessToken != "expo-secret" {
+		t.Fatalf("ExpoPushAccessToken = %q, want configured token", got.ExpoPushAccessToken)
 	}
 	if got.AssetCatalogKey != "catalog/test.json" {
 		t.Fatalf("AssetCatalogKey = %q, want catalog/test.json", got.AssetCatalogKey)

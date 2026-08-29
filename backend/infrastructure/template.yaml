@@ -24,6 +24,11 @@ Parameters:
     Type: String
     Default: ''
     Description: Optional email address subscribed to the infrastructure alarm topic.
+  ExpoPushAccessToken:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: Optional access token used when Expo enhanced push security is enabled.
   TokenValidityMinutes:
     Type: Number
     Default: 60
@@ -361,6 +366,17 @@ Resources:
       BuildMethod: makefile
     Properties:
       Timeout: 20
+      Environment:
+        Variables:
+          EXPO_PUSH_ACCESS_TOKEN: !Ref ExpoPushAccessToken
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref DevicesTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource: !GetAtt DevicesTable.Arn
       Events:
         NotificationJobs:
           Type: SQS
