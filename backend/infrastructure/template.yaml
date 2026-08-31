@@ -100,6 +100,8 @@ Resources:
           - PUT
           - DELETE
           - OPTIONS
+        ExposeHeaders:
+          - X-Correlation-Id
       AccessLogSettings:
         DestinationArn: !GetAtt ApiAccessLogGroup.Arn
         Format: '{"requestId":"$context.requestId","routeKey":"$context.routeKey","status":"$context.status","responseLatency":"$context.responseLatency","integrationError":"$context.integrationErrorMessage"}'
@@ -706,7 +708,6 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Sub '${ProjectName}-${Environment}-alerts'
-      KmsMasterKeyId: alias/aws/sns
       Tags:
         - Key: Project
           Value: !Ref ProjectName
@@ -727,19 +728,41 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub '${ProjectName}-${Environment}-api-5xx'
-      AlarmDescription: API Gateway returned server errors.
-      Namespace: AWS/ApiGateway
-      MetricName: 5xx
-      Dimensions:
-        - Name: ApiId
-          Value: !Ref DollhouseApi
-        - Name: Stage
-          Value: !Ref Environment
-      Statistic: Sum
-      Period: 300
+      AlarmDescription: API Gateway 5xx responses reached five percent for five minutes.
+      Metrics:
+        - Id: serverErrors
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApiGateway
+              MetricName: 5xx
+              Dimensions:
+                - Name: ApiId
+                  Value: !Ref DollhouseApi
+                - Name: Stage
+                  Value: !Ref Environment
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+        - Id: requests
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApiGateway
+              MetricName: Count
+              Dimensions:
+                - Name: ApiId
+                  Value: !Ref DollhouseApi
+                - Name: Stage
+                  Value: !Ref Environment
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+        - Id: errorRate
+          Expression: IF(requests > 0, 100 * serverErrors / requests, 0)
+          Label: API 5xx rate
+          ReturnData: true
       EvaluationPeriods: 1
       DatapointsToAlarm: 1
-      Threshold: 1
+      Threshold: 5
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
       AlarmActions:
@@ -756,7 +779,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub '${ProjectName}-${Environment}-api-latency'
-      AlarmDescription: API Gateway p95 latency exceeded two seconds.
+      AlarmDescription: API Gateway p95 latency exceeded one second for five minutes.
       Namespace: AWS/ApiGateway
       MetricName: Latency
       Dimensions:
@@ -766,9 +789,9 @@ Resources:
           Value: !Ref Environment
       ExtendedStatistic: p95
       Period: 300
-      EvaluationPeriods: 2
-      DatapointsToAlarm: 2
-      Threshold: 2000
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1000
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
       AlarmActions:
@@ -785,17 +808,17 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub '${ProjectName}-${Environment}-notification-backlog'
-      AlarmDescription: Notification jobs are accumulating in the queue.
+      AlarmDescription: The oldest notification job exceeded two minutes for five minutes.
       Namespace: AWS/SQS
-      MetricName: ApproximateNumberOfMessagesVisible
+      MetricName: ApproximateAgeOfOldestMessage
       Dimensions:
         - Name: QueueName
           Value: !GetAtt NotificationQueue.QueueName
       Statistic: Maximum
       Period: 300
-      EvaluationPeriods: 2
-      DatapointsToAlarm: 2
-      Threshold: 25
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 120
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
       AlarmActions:

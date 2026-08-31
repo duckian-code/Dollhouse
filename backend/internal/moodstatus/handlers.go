@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/dollhouse-app/dollhouse/backend/internal/authorization"
+	"github.com/dollhouse-app/dollhouse/backend/internal/observability"
 	"github.com/dollhouse-app/dollhouse/backend/pkg/response"
 )
 
@@ -67,15 +67,15 @@ func (h *Handlers) PublishMood(ctx context.Context, request events.APIGatewayV2H
 	}
 	eventID, err := h.newID()
 	if err != nil {
-		return internalError("generate mood event ID", err), nil
+		return internalError(ctx, "generate mood event ID", err), nil
 	}
 	state.UpdatedAt = h.timestamp()
 	if err := h.store.PublishMood(ctx, userID, eventID, state); err != nil {
-		return h.failure("publish mood", err), nil
+		return h.failure(ctx, "publish mood", err), nil
 	}
 	recipientIDs, err := h.store.ListNotificationRecipientIDs(ctx, userID)
 	if err != nil {
-		return internalError("list notification recipients", err), nil
+		return internalError(ctx, "list notification recipients", err), nil
 	}
 	job := NotificationJob{
 		SchemaVersion: 1, EventID: eventID, SenderUserID: userID,
@@ -83,8 +83,13 @@ func (h *Handlers) PublishMood(ctx context.Context, request events.APIGatewayV2H
 		CreatedAt: state.UpdatedAt,
 	}
 	if err := h.publisher.Publish(ctx, job); err != nil {
-		return internalError("publish notification job", err), nil
+		return internalError(ctx, "publish notification job", err), nil
 	}
+	observability.Emit(ctx,
+		observability.Metric{Name: "MoodUpdatesPublished", Value: 1, Unit: "Count"},
+		observability.Metric{Name: "NotificationJobsCreated", Value: 1, Unit: "Count"},
+		observability.Metric{Name: "NotificationRecipientsQueued", Value: float64(len(recipientIDs)), Unit: "Count"},
+	)
 	return response.JSON(http.StatusCreated, map[string]any{"data": map[string]any{"eventId": eventID, "status": state}})
 }
 
@@ -96,7 +101,7 @@ func (h *Handlers) GetFriendStatuses(ctx context.Context, request events.APIGate
 	}
 	items, nextToken, err := h.store.ListFriendStatuses(ctx, userID, request.QueryStringParameters["nextToken"])
 	if err != nil {
-		return h.failure("get friend statuses", err), nil
+		return h.failure(ctx, "get friend statuses", err), nil
 	}
 	var token any
 	if nextToken != "" {
@@ -184,16 +189,16 @@ func decodeBody(request events.APIGatewayV2HTTPRequest, target any) *events.APIG
 	return nil
 }
 
-func (h *Handlers) failure(operation string, err error) events.APIGatewayV2HTTPResponse {
+func (h *Handlers) failure(ctx context.Context, operation string, err error) events.APIGatewayV2HTTPResponse {
 	var domain *DomainError
 	if errors.As(err, &domain) {
 		return response.Error(domain.Status, domain.Code, domain.Message)
 	}
-	return internalError(operation, err)
+	return internalError(ctx, operation, err)
 }
 
-func internalError(operation string, err error) events.APIGatewayV2HTTPResponse {
-	log.Printf("%s: %v", operation, err)
+func internalError(ctx context.Context, operation string, err error) events.APIGatewayV2HTTPResponse {
+	observability.Logger(ctx).ErrorContext(ctx, "mood/status request failed", "operation", operation, "error", err)
 	return response.Error(http.StatusInternalServerError, "internal_error", "an internal error occurred")
 }
 
@@ -202,12 +207,7 @@ func (h *Handlers) timestamp() string {
 }
 
 func correlationID(request events.APIGatewayV2HTTPRequest, fallback string) string {
-	for name, value := range request.Headers {
-		if strings.EqualFold(name, "x-correlation-id") && strings.TrimSpace(value) != "" {
-			return strings.TrimSpace(value)
-		}
-	}
-	if value := strings.TrimSpace(request.RequestContext.RequestID); value != "" {
+	if value := observability.CorrelationID(request); value != "" {
 		return value
 	}
 	return fallback

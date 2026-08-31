@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/dollhouse-app/dollhouse/backend/internal/observability"
 )
 
 const (
@@ -55,9 +56,14 @@ func (c *Consumer) processRecord(ctx context.Context, record events.SQSMessage) 
 	if err != nil {
 		return err
 	}
-	c.logger.InfoContext(ctx, "notification job started",
+	ctx = observability.WithRequest(ctx, observability.RequestContext{
+		CorrelationID: job.CorrelationID,
+		RequestID:     record.MessageId,
+	}, c.logger)
+	logger := observability.Logger(ctx)
+	logger.InfoContext(ctx, "notification job started",
 		"lifecycle", "started", "messageId", record.MessageId,
-		"eventId", job.EventID, "correlationId", job.CorrelationID,
+		"eventId", job.EventID,
 		"recipientCount", len(job.RecipientUserIDs))
 
 	devices, err := c.store.ListEnabledDevices(ctx, job.RecipientUserIDs)
@@ -65,9 +71,10 @@ func (c *Consumer) processRecord(ctx context.Context, record events.SQSMessage) 
 		return fmt.Errorf("list enabled devices: %w", err)
 	}
 	if len(devices) == 0 {
-		c.logger.InfoContext(ctx, "notification job completed",
+		logger.InfoContext(ctx, "notification job completed",
 			"lifecycle", "completed", "messageId", record.MessageId,
 			"eventId", job.EventID, "attempted", 0, "accepted", 0, "invalidated", 0)
+		emitNotificationMetrics(ctx, 0, 0, 0)
 		return nil
 	}
 
@@ -104,11 +111,21 @@ func (c *Consumer) processRecord(ctx context.Context, record events.SQSMessage) 
 		}
 	}
 
-	c.logger.InfoContext(ctx, "notification job completed",
+	logger.InfoContext(ctx, "notification job completed",
 		"lifecycle", "completed", "messageId", record.MessageId,
 		"eventId", job.EventID, "attempted", len(devices),
 		"accepted", accepted, "invalidated", invalidated)
+	emitNotificationMetrics(ctx, len(devices), accepted, invalidated)
 	return nil
+}
+
+func emitNotificationMetrics(ctx context.Context, attempted, succeeded, invalidated int) {
+	observability.Emit(ctx,
+		observability.Metric{Name: "NotificationJobsProcessed", Value: 1, Unit: "Count"},
+		observability.Metric{Name: "NotificationDeliveryAttempts", Value: float64(attempted), Unit: "Count"},
+		observability.Metric{Name: "NotificationDeliverySuccesses", Value: float64(succeeded), Unit: "Count"},
+		observability.Metric{Name: "InvalidDeviceTokens", Value: float64(invalidated), Unit: "Count"},
+	)
 }
 
 func decodeJob(body string) (Job, error) {

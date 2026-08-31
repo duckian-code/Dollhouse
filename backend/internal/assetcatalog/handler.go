@@ -2,11 +2,11 @@ package assetcatalog
 
 import (
 	"context"
-	"log"
 	"net/http"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/dollhouse-app/dollhouse/backend/internal/authorization"
+	"github.com/dollhouse-app/dollhouse/backend/internal/observability"
 	"github.com/dollhouse-app/dollhouse/backend/pkg/response"
 )
 
@@ -29,7 +29,7 @@ func (h *Handler) GetCatalog(ctx context.Context, request events.APIGatewayV2HTT
 	}
 	catalog, err := h.service.GetCatalog(ctx)
 	if err != nil {
-		log.Printf("asset catalog request failed error=%q", err)
+		observability.Logger(ctx).ErrorContext(ctx, "asset catalog request failed", "error", err)
 		return response.Error(http.StatusInternalServerError, "internal_error", "an internal error occurred"), nil
 	}
 	return response.JSON(http.StatusOK, map[string]any{"data": catalog})
