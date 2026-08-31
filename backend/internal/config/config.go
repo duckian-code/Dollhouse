@@ -16,6 +16,7 @@ type Config struct {
 	AssetCatalogKey      string
 	AssetURLTTLSeconds   int
 	NotificationQueueURL string
+	ExpoPushAccessToken  string
 }
 
 // Load reads configuration from environment variables. Defaults are limited to
@@ -32,6 +33,7 @@ func Load() Config {
 		AssetCatalogKey:      getOrDefault("ASSET_CATALOG_KEY", "catalog/v1.json"),
 		AssetURLTTLSeconds:   900,
 		NotificationQueueURL: os.Getenv("NOTIFICATION_QUEUE_URL"),
+		ExpoPushAccessToken:  os.Getenv("EXPO_PUSH_ACCESS_TOKEN"),
 	}
 }
 
