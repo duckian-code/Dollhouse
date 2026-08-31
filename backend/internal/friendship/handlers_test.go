@@ -103,6 +103,26 @@ func TestSearchUsersValidatesAuthenticationAndQuery(t *testing.T) {
 	}
 }
 
+func TestEveryFriendshipRouteRequiresAuthentication(t *testing.T) {
+	handlers := fixedHandlers(&fakeStore{})
+	tests := map[string]func(context.Context, events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error){
+		"GET /users/search":                  handlers.SearchUsers,
+		"POST /friend-requests":              handlers.SendFriendRequest,
+		"GET /friend-requests":               handlers.ListFriendRequests,
+		"POST /friend-requests/{id}/accept":  handlers.AcceptFriendRequest,
+		"POST /friend-requests/{id}/decline": handlers.DeclineFriendRequest,
+		"DELETE /friends/{id}":               handlers.RemoveFriend,
+	}
+	for name, invoke := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := invoke(context.Background(), events.APIGatewayV2HTTPRequest{})
+			if err != nil || got.StatusCode != http.StatusUnauthorized || errorCode(got.Body) != "unauthenticated" {
+				t.Fatalf("response = %#v, err = %v", got, err)
+			}
+		})
+	}
+}
+
 func TestSendFriendRequestReturnsContractShape(t *testing.T) {
 	store := &fakeStore{request: FriendRequest{RequestID: "request-123", User: UserSummary{UserID: "user-456"}, Status: StatusPendingOutgoing, RequestedAt: "2026-08-16T18:30:45Z"}}
 	got, err := fixedHandlers(store).SendFriendRequest(context.Background(), authenticatedRequest(`{"userId":"user-456"}`))

@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/dollhouse-app/dollhouse/backend/internal/authorization"
 	"github.com/dollhouse-app/dollhouse/backend/pkg/response"
 )
 
@@ -152,16 +153,11 @@ func routeIdentity(request events.APIGatewayV2HTTPRequest, parameter string) (st
 }
 
 func authenticatedUserID(request events.APIGatewayV2HTTPRequest) (string, *events.APIGatewayV2HTTPResponse) {
-	if request.RequestContext.Authorizer == nil || request.RequestContext.Authorizer.JWT == nil {
-		failure := response.Error(http.StatusUnauthorized, "unauthenticated", "valid Cognito authentication is required")
-		return "", &failure
+	principal, failure := authorization.Authenticate(request)
+	if failure != nil {
+		return "", failure
 	}
-	userID := strings.TrimSpace(request.RequestContext.Authorizer.JWT.Claims["sub"])
-	if userID == "" {
-		failure := response.Error(http.StatusUnauthorized, "unauthenticated", "valid Cognito authentication is required")
-		return "", &failure
-	}
-	return userID, nil
+	return principal.Subject, nil
 }
 
 func decodeBody(request events.APIGatewayV2HTTPRequest, target any) *events.APIGatewayV2HTTPResponse {
