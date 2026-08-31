@@ -332,6 +332,8 @@ Resources:
             TableName: !Ref UsersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref MoodEventsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref FriendshipsTable
         - SQSSendMessagePolicy:
             QueueName: !GetAtt NotificationQueue.QueueName
       Events:

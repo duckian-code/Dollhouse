@@ -167,3 +167,60 @@ Pass a different stack name as the script's first argument when needed:
 ```sh
 bash scripts/verify-s3-security.sh dollhouse-staging
 ```
+
+## Deployment verification
+
+The deployment checks require AWS credentials with read access to the stack and
+its Lambda, IAM, CloudWatch, SQS, Logs, DynamoDB, S3, and Cognito resources.
+`jq`, `curl`, the AWS CLI, Go, and AWS SAM must be installed locally.
+
+Run local tests, static analysis, infrastructure linting, and a clean build:
+
+```sh
+go test ./...
+go vet ./...
+sam validate --lint --template-file infrastructure/template.yaml
+sam build --parallel --template-file infrastructure/template.yaml
+```
+
+Deploy the reviewed build and verify the live configuration:
+
+```sh
+sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
+make verify-deployment
+make verify-s3-security
+```
+
+Run the HTTP acceptance test against every documented API route:
+
+```sh
+make verify-api-e2e
+```
+
+The API test creates two uniquely named Cognito users, exercises profile, doll,
+asset, friendship, mood, friend-status, and authorization behavior, then removes
+the exact Cognito users and DynamoDB partitions it created even when a check
+fails. It prints the mood `eventId` whose notification job can be followed
+through the deployed retry and dead-letter path:
+
+```sh
+make verify-notification-redrive EVENT_ID=<event-id-from-api-test>
+```
+
+The redrive check verifies the source queue's five-attempt policy and 120-second
+visibility timeout, waits for that exact event in the DLQ, and deletes only the
+verified test message. Unrelated DLQ messages are immediately made visible
+again. Override `STACK_NAME`, `AWS_REGION`, `REDRIVE_TIMEOUT_SECONDS`, or
+`REDRIVE_POLL_SECONDS` when verifying a different environment.
+
+To remove the SAM-managed development stack after the project is no longer
+needed:
+
+```sh
+sam delete --stack-name dollhouse-dev --region us-east-2
+```
+
+The DynamoDB tables and asset bucket use `DeletionPolicy: Retain`; stack deletion
+does not remove them. Review or back up retained data, empty only the confirmed
+project bucket, and delete only the confirmed `dollhouse-dev-*` retained
+resources separately. Never use a broad S3 or DynamoDB cleanup command.
