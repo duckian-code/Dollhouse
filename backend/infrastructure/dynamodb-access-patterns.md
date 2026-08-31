@@ -11,8 +11,6 @@ Primary key: `userId` (string partition key).
 
 Indexes:
 
-- `EmailIndex`: `normalizedEmail` partition key. Supports exact, case-insensitive
-  email lookup and uniqueness checks.
 - `UserSearchIndex`: `searchPartition` partition key and `normalizedUsername`
   sort key. MVP user records use `searchPartition = USER`; query with
   `begins_with(normalizedUsername, :prefix)` for username search. This single
@@ -22,10 +20,22 @@ One item contains the profile, doll configuration, and current disclosed status.
 The application model is:
 
 ```text
-userId, cognitoSub, email, normalizedEmail, username, normalizedUsername,
-searchPartition="USER", displayName, bio?, role, dollConfiguration?,
-currentStatus?, createdAt, updatedAt
+userId, cognitoSub, username?, normalizedUsername?, searchPartition?,
+displayName?, bio?, onboardingComplete, role, dollConfiguration?, currentStatus?,
+createdAt, updatedAt
 ```
+
+Cognito email remains only in Cognito and is never copied into this table.
+Before onboarding, username and display name are empty, `onboardingComplete` is
+false, and `searchPartition` is absent so the profile cannot appear in search.
+Once both public fields are stored, `searchPartition = USER` enables search.
+
+Username ownership uses a second item in the same table with primary key
+`USERNAME#<normalizedUsername>`, `entityType = USERNAME_RESERVATION`, and the
+opaque `ownerUserId`. Normalization trims surrounding whitespace and applies
+Unicode-aware lowercase conversion. A profile claim or rename transactionally
+puts the new conditional reservation, updates the profile, and deletes the old
+reservation. This makes `PUT /profile` authoritative under concurrent requests.
 
 `dollConfiguration` contains `bodyAssetId`, `hairAssetId`, `eyesAssetId`,
 `noseAssetId`, `mouthAssetId`, `clothingAssetIds`, and `updatedAt`.
@@ -36,8 +46,9 @@ the approved S3 catalog, never embedded assets.
 | Workflow | DynamoDB operation |
 | --- | --- |
 | Get current profile or doll configuration | `GetItem(userId)` |
-| Update owned profile, doll, or current status | conditional `UpdateItem(userId)` |
-| Find user by email | `Query EmailIndex` with `normalizedEmail = :email` |
+| Update public username | `TransactWriteItems` for reservation, profile update, and old-reservation release |
+| Update other owned profile, doll, or current status fields | conditional `UpdateItem(userId)` |
+| Check username availability | strongly consistent `GetItem(USERNAME#normalized)`; advisory only |
 | Search users by username prefix | `Query UserSearchIndex` with `searchPartition = USER` and `begins_with(normalizedUsername, :prefix)` |
 | Read accepted friends' current status | `BatchGetItem` by IDs returned from Friendships |
 
@@ -114,5 +125,5 @@ messages, API responses, or the Users table.
 accepted and pending mirrored relationships, a mood event, and one device. All
 fixture primary keys begin with `TEST#`; rerunning the script overwrites only
 those deterministic fixtures. `scripts/verify-dynamodb-access-patterns.sh`
-exercises base-table reads, both user indexes, the friendship status index, mood
+exercises base-table reads, the user-search index, the friendship status index, mood
 history, device lookup, encryption state, and point-in-time recovery.

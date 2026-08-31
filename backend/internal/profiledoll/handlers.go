@@ -113,9 +113,29 @@ func (h *Handlers) UpdateProfile(ctx context.Context, request events.APIGatewayV
 	}
 	profile, err := h.store.UpdateProfile(ctx, identity.UserID, changes, h.timestamp())
 	if err != nil {
-		return internalError(ctx, "update profile", err), nil
+		return h.failure(ctx, "update profile", err), nil
 	}
 	return response.JSON(http.StatusOK, map[string]any{"data": map[string]any{"profile": profile}})
+}
+
+// UsernameAvailability reports whether the normalized username is unreserved.
+// This check is advisory; UpdateProfile performs the authoritative claim.
+func (h *Handlers) UsernameAvailability(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	identity, failure := identityFrom(request)
+	if failure != nil {
+		return *failure, nil
+	}
+	username, err := validateUsername(request.QueryStringParameters["username"])
+	if err != nil {
+		return response.Error(http.StatusBadRequest, "validation_failed", err.Error()), nil
+	}
+	available, err := h.store.UsernameAvailable(ctx, NormalizeUsername(username), identity.UserID)
+	if err != nil {
+		return internalError(ctx, "check username availability", err), nil
+	}
+	return response.JSON(http.StatusOK, map[string]any{"data": map[string]any{
+		"username": username, "available": available,
+	}})
 }
 
 type updateDollRequest struct {
@@ -182,7 +202,7 @@ func identityFrom(request events.APIGatewayV2HTTPRequest) (Identity, *events.API
 	if failure != nil {
 		return Identity{}, failure
 	}
-	return Identity{UserID: principal.Subject, Username: principal.Username, DisplayName: principal.DisplayName}, nil
+	return Identity{UserID: principal.Subject}, nil
 }
 
 func decodeBody(request events.APIGatewayV2HTTPRequest, target any) *events.APIGatewayV2HTTPResponse {
@@ -234,12 +254,12 @@ func validateProfileUpdate(input updateProfileRequest) (ProfileChanges, error) {
 		Bio:         OptionalString{Set: input.Bio.Set, Value: input.Bio.Value},
 	}
 	if changes.Username.Set {
-		if changes.Username.Value == nil || strings.TrimSpace(*changes.Username.Value) == "" {
-			return ProfileChanges{}, errors.New("username must be a non-empty string")
+		if changes.Username.Value == nil {
+			return ProfileChanges{}, errors.New("username must be a string")
 		}
-		value := strings.TrimSpace(*changes.Username.Value)
-		if utf8.RuneCountInString(value) > 50 {
-			return ProfileChanges{}, errors.New("username must be 50 characters or fewer")
+		value, err := validateUsername(*changes.Username.Value)
+		if err != nil {
+			return ProfileChanges{}, err
 		}
 		changes.Username.Value = &value
 	}
@@ -314,4 +334,23 @@ func (h *Handlers) timestamp() string {
 func internalError(ctx context.Context, operation string, err error) events.APIGatewayV2HTTPResponse {
 	observability.Logger(ctx).ErrorContext(ctx, "profile/doll request failed", "operation", operation, "error", err)
 	return response.Error(http.StatusInternalServerError, "internal_error", "an internal error occurred")
+}
+
+func (h *Handlers) failure(ctx context.Context, operation string, err error) events.APIGatewayV2HTTPResponse {
+	var domain *DomainError
+	if errors.As(err, &domain) {
+		return response.Error(domain.Status, domain.Code, domain.Message)
+	}
+	return internalError(ctx, operation, err)
+}
+
+func validateUsername(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", errors.New("username must be a non-empty string")
+	}
+	if utf8.RuneCountInString(value) > 50 {
+		return "", errors.New("username must be 50 characters or fewer")
+	}
+	return value, nil
 }

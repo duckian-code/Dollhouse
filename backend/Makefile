@@ -1,4 +1,4 @@
-.PHONY: build test validate-infra verify-s3-security verify-deployment verify-api-e2e verify-notification-redrive verify-monitoring-trace send-test-alert clean
+.PHONY: build test validate-infra migrate-legacy-usernames verify-s3-security verify-deployment verify-api-e2e verify-notification-redrive verify-monitoring-trace send-test-alert clean
 
 COMMANDS := $(notdir $(wildcard cmd/*))
 
@@ -14,6 +14,9 @@ test:
 
 validate-infra:
 	sam validate --lint --template-file infrastructure/template.yaml
+
+migrate-legacy-usernames:
+	bash scripts/migrate-legacy-usernames.sh
 
 verify-s3-security:
 	bash scripts/verify-s3-security.sh
@@ -48,6 +51,7 @@ endef
 
 $(eval $(call BUILD_LAMBDA,get-current-profile,GetCurrentProfileFunction))
 $(eval $(call BUILD_LAMBDA,update-profile,UpdateProfileFunction))
+$(eval $(call BUILD_LAMBDA,username-availability,UsernameAvailabilityFunction))
 $(eval $(call BUILD_LAMBDA,get-doll-configuration,GetDollConfigurationFunction))
 $(eval $(call BUILD_LAMBDA,get-asset-catalog,GetAssetCatalogFunction))
 $(eval $(call BUILD_LAMBDA,update-doll-configuration,UpdateDollConfigurationFunction))

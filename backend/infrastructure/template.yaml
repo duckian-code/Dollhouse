@@ -131,6 +131,7 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:PutItem
+                - dynamodb:UpdateItem
               Resource: !GetAtt UsersTable.Arn
       Events:
         Api:
@@ -156,6 +157,22 @@ Resources:
             Path: /profile
             Method: PUT
 
+  UsernameAvailabilityFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DollhouseApi
+            Path: /users/username-availability
+            Method: GET
+
   GetDollConfigurationFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -168,6 +185,7 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:PutItem
+                - dynamodb:UpdateItem
               Resource: !GetAtt UsersTable.Arn
       Events:
         Api:
@@ -466,8 +484,6 @@ Resources:
       AttributeDefinitions:
         - AttributeName: userId
           AttributeType: S
-        - AttributeName: normalizedEmail
-          AttributeType: S
         - AttributeName: searchPartition
           AttributeType: S
         - AttributeName: normalizedUsername
@@ -476,12 +492,6 @@ Resources:
         - AttributeName: userId
           KeyType: HASH
       GlobalSecondaryIndexes:
-        - IndexName: EmailIndex
-          KeySchema:
-            - AttributeName: normalizedEmail
-              KeyType: HASH
-          Projection:
-            ProjectionType: ALL
         - IndexName: UserSearchIndex
           KeySchema:
             - AttributeName: searchPartition

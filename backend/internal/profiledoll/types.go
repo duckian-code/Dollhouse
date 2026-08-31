@@ -4,12 +4,13 @@ import "context"
 
 // Profile is the public representation of a Dollhouse user.
 type Profile struct {
-	UserID      string  `json:"userId" dynamodbav:"userId"`
-	Username    string  `json:"username" dynamodbav:"username"`
-	DisplayName string  `json:"displayName" dynamodbav:"displayName"`
-	Bio         *string `json:"bio" dynamodbav:"bio"`
-	CreatedAt   string  `json:"createdAt" dynamodbav:"createdAt"`
-	UpdatedAt   string  `json:"updatedAt" dynamodbav:"updatedAt"`
+	UserID             string  `json:"userId" dynamodbav:"userId"`
+	Username           string  `json:"username" dynamodbav:"username"`
+	DisplayName        string  `json:"displayName" dynamodbav:"displayName"`
+	Bio                *string `json:"bio" dynamodbav:"bio"`
+	OnboardingComplete bool    `json:"onboardingComplete" dynamodbav:"onboardingComplete"`
+	CreatedAt          string  `json:"createdAt" dynamodbav:"createdAt"`
+	UpdatedAt          string  `json:"updatedAt" dynamodbav:"updatedAt"`
 }
 
 // DollConfiguration contains the approved asset IDs used to render a doll.
@@ -25,9 +26,7 @@ type DollConfiguration struct {
 
 // Identity is derived exclusively from API Gateway's verified Cognito claims.
 type Identity struct {
-	UserID      string
-	Username    string
-	DisplayName string
+	UserID string
 }
 
 // OptionalString distinguishes an omitted field from an explicit JSON null.
@@ -47,6 +46,16 @@ type ProfileChanges struct {
 type Store interface {
 	EnsureUser(context.Context, Identity, string) (Profile, error)
 	UpdateProfile(context.Context, string, ProfileChanges, string) (Profile, error)
+	UsernameAvailable(context.Context, string, string) (bool, error)
 	GetDoll(context.Context, string) (*DollConfiguration, error)
 	UpdateDoll(context.Context, string, DollConfiguration, string) (DollConfiguration, error)
 }
+
+// DomainError maps an expected persistence/domain failure to an API response.
+type DomainError struct {
+	Status  int
+	Code    string
+	Message string
+}
+
+func (e *DomainError) Error() string { return e.Message }

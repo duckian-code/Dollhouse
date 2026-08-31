@@ -46,6 +46,7 @@ export interface UserSummary {
 
 export interface Profile extends UserSummary {
   bio: string | null;
+  onboardingComplete: boolean;
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
 }
@@ -119,6 +120,10 @@ export interface FriendStatus {
 export type FriendStatusesResponse = PaginatedResponse<FriendStatus>;
 
 export type ProfileResponse = ApiResponse<{ profile: Profile }>;
+export type UsernameAvailabilityResponse = ApiResponse<{
+  username: string;
+  available: boolean;
+}>;
 export type AvatarCatalogResponse = ApiResponse<AvatarCatalog>;
 export type DollConfigurationResponse = ApiResponse<{
   configuration: DollConfiguration;

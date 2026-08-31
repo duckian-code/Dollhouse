@@ -14,6 +14,7 @@ import type {
   UpdateDollConfigurationRequest,
   UpdateProfileRequest,
   UserSummary,
+  UsernameAvailabilityResponse,
 } from '@/types/api';
 
 function jsonRequest(method: 'POST' | 'PUT', body: unknown): RequestInit {
@@ -30,6 +31,13 @@ export function getProfile() {
 
 export function updateProfile(request: UpdateProfileRequest) {
   return apiRequest<ProfileResponse>('/profile', jsonRequest('PUT', request));
+}
+
+export function getUsernameAvailability(username: string) {
+  const params = new URLSearchParams({ username });
+  return apiRequest<UsernameAvailabilityResponse>(
+    `/users/username-availability?${params.toString()}`,
+  );
 }
 
 export function getDollConfiguration() {

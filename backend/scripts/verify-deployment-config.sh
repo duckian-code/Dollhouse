@@ -55,7 +55,7 @@ notification_dlq_url="$(stack_output NotificationDeadLetterQueueUrl)"
 resources="$(aws cloudformation list-stack-resources --stack-name "$stack_name" --region "$region" --query StackResourceSummaries --output json)"
 functions="$(jq -r '.[] | select(.ResourceType == "AWS::Lambda::Function") | .PhysicalResourceId' <<<"$resources")"
 function_count="$(wc -w <<<"$functions" | tr -d ' ')"
-assert_equals "Lambda function count" 14 "$function_count"
+assert_equals "Lambda function count" 15 "$function_count"
 
 while IFS= read -r function_name; do
   [[ -n "$function_name" ]] || continue
@@ -121,6 +121,7 @@ done <<<"$roles"
 publish_role="$(jq -r '.[] | select(.LogicalResourceId == "PublishMoodFunctionRole") | .PhysicalResourceId' <<<"$resources")"
 catalog_role="$(jq -r '.[] | select(.LogicalResourceId == "GetAssetCatalogFunctionRole") | .PhysicalResourceId' <<<"$resources")"
 search_role="$(jq -r '.[] | select(.LogicalResourceId == "SearchUsersFunctionRole") | .PhysicalResourceId' <<<"$resources")"
+availability_role="$(jq -r '.[] | select(.LogicalResourceId == "UsernameAvailabilityFunctionRole") | .PhysicalResourceId' <<<"$resources")"
 account_id="$(aws sts get-caller-identity --query Account --output text)"
 friendship_index_arn="arn:aws:dynamodb:${region}:${account_id}:table/${friendships_table}/index/UserStatusIndex"
 user_index_arn="arn:aws:dynamodb:${region}:${account_id}:table/${users_table}/index/UserSearchIndex"
@@ -132,6 +133,8 @@ assert_decision "GetAssetCatalog catalog read" "$catalog_role" s3:GetObject "$as
 assert_decision "GetAssetCatalog catalog write" "$catalog_role" s3:PutObject "$asset_arn" implicitDeny
 assert_decision "SearchUsers index query" "$search_role" dynamodb:Query "$user_index_arn" allowed
 assert_decision "SearchUsers table write" "$search_role" dynamodb:PutItem "arn:aws:dynamodb:${region}:${account_id}:table/${users_table}" implicitDeny
+assert_decision "UsernameAvailability reservation read" "$availability_role" dynamodb:GetItem "arn:aws:dynamodb:${region}:${account_id}:table/${users_table}" allowed
+assert_decision "UsernameAvailability reservation write" "$availability_role" dynamodb:PutItem "arn:aws:dynamodb:${region}:${account_id}:table/${users_table}" implicitDeny
 
 queue_attributes="$(aws sqs get-queue-attributes --region "$region" --queue-url "$notification_queue_url" --attribute-names RedrivePolicy VisibilityTimeout KmsMasterKeyId --query Attributes --output json)"
 assert_equals "notification visibility timeout" 120 "$(jq -r '.VisibilityTimeout' <<<"$queue_attributes")"

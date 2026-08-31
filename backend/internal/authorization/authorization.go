@@ -19,10 +19,8 @@ const (
 // Principal is the authenticated caller represented by verified Cognito
 // claims. Subject is the only identifier handlers may use for owned objects.
 type Principal struct {
-	Subject     string
-	Username    string
-	DisplayName string
-	Groups      map[string]struct{}
+	Subject string
+	Groups  map[string]struct{}
 }
 
 // Authenticate returns the caller represented by API Gateway's verified JWT.
@@ -35,20 +33,8 @@ func Authenticate(request events.APIGatewayV2HTTPRequest) (Principal, *events.AP
 	if subject == "" {
 		return Principal{}, unauthenticated()
 	}
-	username := strings.TrimSpace(claims["username"])
-	if username == "" {
-		username = strings.TrimSpace(claims["cognito:username"])
-	}
-	if username == "" {
-		username = subject
-	}
-	displayName := strings.TrimSpace(claims["name"])
-	if displayName == "" {
-		displayName = username
-	}
 	return Principal{
-		Subject: subject, Username: username, DisplayName: displayName,
-		Groups: parseGroups(claims["cognito:groups"]),
+		Subject: subject, Groups: parseGroups(claims["cognito:groups"]),
 	}, nil
 }
 
