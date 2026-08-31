@@ -154,6 +154,34 @@ if ! jq -e 'all(.[]; .ActionsEnabled == true and (.AlarmActions | length) > 0 an
 fi
 echo "CloudWatch alarms and actions: verified"
 
+api_5xx="$(jq -e --arg name "${stack_name}-api-5xx" '.[] | select(.AlarmName == $name)' <<<"$alarms")"
+assert_equals "API 5xx threshold percent" 5 "$(jq -r '.Threshold | floor' <<<"$api_5xx")"
+assert_equals "API 5xx evaluation periods" 1 "$(jq -r '.EvaluationPeriods' <<<"$api_5xx")"
+if ! jq -e '
+  any(.Metrics[]; .Id == "serverErrors" and .MetricStat.Metric.MetricName == "5xx" and .MetricStat.Period == 300) and
+  any(.Metrics[]; .Id == "requests" and .MetricStat.Metric.MetricName == "Count" and .MetricStat.Period == 300) and
+  any(.Metrics[]; .Id == "errorRate" and (.Expression | contains("serverErrors / requests")))
+' <<<"$api_5xx" >/dev/null; then
+  echo "API 5xx percentage metric math is not configured as expected" >&2
+  exit 1
+fi
+echo "API 5xx percentage alarm: verified"
+
+api_latency="$(jq -e --arg name "${stack_name}-api-latency" '.[] | select(.AlarmName == $name)' <<<"$alarms")"
+assert_equals "API latency metric" Latency "$(jq -r '.MetricName' <<<"$api_latency")"
+assert_equals "API latency statistic" p95 "$(jq -r '.ExtendedStatistic' <<<"$api_latency")"
+assert_equals "API latency period" 300 "$(jq -r '.Period' <<<"$api_latency")"
+assert_equals "API latency threshold milliseconds" 1000 "$(jq -r '.Threshold | floor' <<<"$api_latency")"
+
+backlog="$(jq -e --arg name "${stack_name}-notification-backlog" '.[] | select(.AlarmName == $name)' <<<"$alarms")"
+assert_equals "notification backlog metric" ApproximateAgeOfOldestMessage "$(jq -r '.MetricName' <<<"$backlog")"
+assert_equals "notification backlog period" 300 "$(jq -r '.Period' <<<"$backlog")"
+assert_equals "notification backlog threshold seconds" 120 "$(jq -r '.Threshold | floor' <<<"$backlog")"
+
+dlq_alarm="$(jq -e --arg name "${stack_name}-notification-dlq" '.[] | select(.AlarmName == $name)' <<<"$alarms")"
+assert_equals "notification DLQ metric" ApproximateNumberOfMessagesVisible "$(jq -r '.MetricName' <<<"$dlq_alarm")"
+assert_equals "notification DLQ threshold" 1 "$(jq -r '.Threshold | floor' <<<"$dlq_alarm")"
+
 if [[ ! "$api_url" =~ ^https://[a-z0-9]+\.execute-api\.${region}\.amazonaws\.com/${environment}$ ]]; then
   echo "API URL stack output has an unexpected format: $api_url" >&2
   exit 1

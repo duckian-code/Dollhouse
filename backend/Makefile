@@ -1,4 +1,4 @@
-.PHONY: build test validate-infra verify-s3-security verify-deployment verify-api-e2e verify-notification-redrive clean
+.PHONY: build test validate-infra verify-s3-security verify-deployment verify-api-e2e verify-notification-redrive verify-monitoring-trace send-test-alert clean
 
 COMMANDS := $(notdir $(wildcard cmd/*))
 
@@ -27,6 +27,13 @@ verify-api-e2e:
 verify-notification-redrive:
 	@test -n "$(EVENT_ID)" || (echo "EVENT_ID is required" >&2; exit 2)
 	bash scripts/verify-notification-redrive.sh "$(EVENT_ID)"
+
+verify-monitoring-trace:
+	@test -n "$(CORRELATION_ID)" || (echo "CORRELATION_ID is required" >&2; exit 2)
+	bash scripts/verify-monitoring-trace.sh "$(CORRELATION_ID)"
+
+send-test-alert:
+	bash scripts/send-test-alert.sh
 
 clean:
 	rm -rf .build

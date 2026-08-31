@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/dollhouse-app/dollhouse/backend/internal/assetcatalog"
 	"github.com/dollhouse-app/dollhouse/backend/internal/authorization"
+	"github.com/dollhouse-app/dollhouse/backend/internal/observability"
 	"github.com/dollhouse-app/dollhouse/backend/pkg/response"
 )
 
@@ -47,7 +47,7 @@ func (h *Handlers) GetProfile(ctx context.Context, request events.APIGatewayV2HT
 	}
 	profile, err := h.store.EnsureUser(ctx, identity, h.timestamp())
 	if err != nil {
-		return internalError("get profile", err), nil
+		return internalError(ctx, "get profile", err), nil
 	}
 	return response.JSON(http.StatusOK, map[string]any{"data": map[string]any{"profile": profile}})
 }
@@ -109,11 +109,11 @@ func (h *Handlers) UpdateProfile(ctx context.Context, request events.APIGatewayV
 		return response.Error(http.StatusBadRequest, "validation_failed", err.Error()), nil
 	}
 	if _, err = h.store.EnsureUser(ctx, identity, h.timestamp()); err != nil {
-		return internalError("ensure profile", err), nil
+		return internalError(ctx, "ensure profile", err), nil
 	}
 	profile, err := h.store.UpdateProfile(ctx, identity.UserID, changes, h.timestamp())
 	if err != nil {
-		return internalError("update profile", err), nil
+		return internalError(ctx, "update profile", err), nil
 	}
 	return response.JSON(http.StatusOK, map[string]any{"data": map[string]any{"profile": profile}})
 }
@@ -134,11 +134,11 @@ func (h *Handlers) GetDoll(ctx context.Context, request events.APIGatewayV2HTTPR
 		return *failure, nil
 	}
 	if _, err := h.store.EnsureUser(ctx, identity, h.timestamp()); err != nil {
-		return internalError("ensure profile", err), nil
+		return internalError(ctx, "ensure profile", err), nil
 	}
 	configuration, err := h.store.GetDoll(ctx, identity.UserID)
 	if err != nil {
-		return internalError("get doll", err), nil
+		return internalError(ctx, "get doll", err), nil
 	}
 	if configuration == nil {
 		return response.Error(http.StatusNotFound, "not_found", "doll configuration not found"), nil
@@ -164,15 +164,15 @@ func (h *Handlers) UpdateDoll(ctx context.Context, request events.APIGatewayV2HT
 		if assetcatalog.IsSelectionError(err) {
 			return response.Error(http.StatusBadRequest, "validation_failed", err.Error()), nil
 		}
-		return internalError("validate doll assets", err), nil
+		return internalError(ctx, "validate doll assets", err), nil
 	}
 	now := h.timestamp()
 	if _, err = h.store.EnsureUser(ctx, identity, now); err != nil {
-		return internalError("ensure profile", err), nil
+		return internalError(ctx, "ensure profile", err), nil
 	}
 	configuration, err = h.store.UpdateDoll(ctx, identity.UserID, configuration, now)
 	if err != nil {
-		return internalError("update doll", err), nil
+		return internalError(ctx, "update doll", err), nil
 	}
 	return response.JSON(http.StatusOK, map[string]any{"data": map[string]any{"configuration": configuration}})
 }
@@ -311,7 +311,7 @@ func (h *Handlers) timestamp() string {
 	return h.now().UTC().Truncate(time.Second).Format(time.RFC3339)
 }
 
-func internalError(operation string, err error) events.APIGatewayV2HTTPResponse {
-	log.Printf("profile/doll request failed operation=%q error=%q", operation, err)
+func internalError(ctx context.Context, operation string, err error) events.APIGatewayV2HTTPResponse {
+	observability.Logger(ctx).ErrorContext(ctx, "profile/doll request failed", "operation", operation, "error", err)
 	return response.Error(http.StatusInternalServerError, "internal_error", "an internal error occurred")
 }

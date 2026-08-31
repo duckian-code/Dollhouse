@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/dollhouse-app/dollhouse/backend/internal/authorization"
+	"github.com/dollhouse-app/dollhouse/backend/internal/observability"
 	"github.com/dollhouse-app/dollhouse/backend/pkg/response"
 )
 
@@ -49,7 +49,7 @@ func (h *Handlers) SearchUsers(ctx context.Context, request events.APIGatewayV2H
 	}
 	items, nextToken, err := h.store.SearchUsers(ctx, query, request.QueryStringParameters["nextToken"], userID)
 	if err != nil {
-		return h.failure("search users", err), nil
+		return h.failure(ctx, "search users", err), nil
 	}
 	return response.JSON(http.StatusOK, map[string]any{"data": map[string]any{"items": items, "nextToken": nullableToken(nextToken)}})
 }
@@ -77,11 +77,11 @@ func (h *Handlers) SendFriendRequest(ctx context.Context, request events.APIGate
 	}
 	requestID, err := h.newID()
 	if err != nil {
-		return internalError("generate friend request ID", err), nil
+		return internalError(ctx, "generate friend request ID", err), nil
 	}
 	friendRequest, err := h.store.SendRequest(ctx, userID, input.UserID, requestID, h.timestamp())
 	if err != nil {
-		return h.failure("send friend request", err), nil
+		return h.failure(ctx, "send friend request", err), nil
 	}
 	return response.JSON(http.StatusCreated, map[string]any{"data": map[string]any{"friendRequest": friendRequest}})
 }
@@ -94,7 +94,7 @@ func (h *Handlers) ListFriendRequests(ctx context.Context, request events.APIGat
 	}
 	incoming, outgoing, err := h.store.ListRequests(ctx, userID)
 	if err != nil {
-		return h.failure("list friend requests", err), nil
+		return h.failure(ctx, "list friend requests", err), nil
 	}
 	return response.JSON(http.StatusOK, map[string]any{"data": map[string]any{"incoming": incoming, "outgoing": outgoing}})
 }
@@ -107,7 +107,7 @@ func (h *Handlers) AcceptFriendRequest(ctx context.Context, request events.APIGa
 	}
 	friendship, err := h.store.AcceptRequest(ctx, userID, requestID, h.timestamp())
 	if err != nil {
-		return h.failure("accept friend request", err), nil
+		return h.failure(ctx, "accept friend request", err), nil
 	}
 	return response.JSON(http.StatusOK, map[string]any{"data": map[string]any{"friendship": friendship}})
 }
@@ -119,7 +119,7 @@ func (h *Handlers) DeclineFriendRequest(ctx context.Context, request events.APIG
 		return *failure, nil
 	}
 	if err := h.store.DeclineRequest(ctx, userID, requestID); err != nil {
-		return h.failure("decline friend request", err), nil
+		return h.failure(ctx, "decline friend request", err), nil
 	}
 	return events.APIGatewayV2HTTPResponse{StatusCode: http.StatusNoContent}, nil
 }
@@ -134,7 +134,7 @@ func (h *Handlers) RemoveFriend(ctx context.Context, request events.APIGatewayV2
 		return response.Error(http.StatusBadRequest, "validation_failed", "friendId cannot identify the signed-in user"), nil
 	}
 	if err := h.store.RemoveFriend(ctx, userID, friendID); err != nil {
-		return h.failure("remove friend", err), nil
+		return h.failure(ctx, "remove friend", err), nil
 	}
 	return events.APIGatewayV2HTTPResponse{StatusCode: http.StatusNoContent}, nil
 }
@@ -192,16 +192,16 @@ func decodeBody(request events.APIGatewayV2HTTPRequest, target any) *events.APIG
 	return nil
 }
 
-func (h *Handlers) failure(operation string, err error) events.APIGatewayV2HTTPResponse {
+func (h *Handlers) failure(ctx context.Context, operation string, err error) events.APIGatewayV2HTTPResponse {
 	var domain *DomainError
 	if errors.As(err, &domain) {
 		return response.Error(domain.Status, domain.Code, domain.Message)
 	}
-	return internalError(operation, err)
+	return internalError(ctx, operation, err)
 }
 
-func internalError(operation string, err error) events.APIGatewayV2HTTPResponse {
-	log.Printf("%s: %v", operation, err)
+func internalError(ctx context.Context, operation string, err error) events.APIGatewayV2HTTPResponse {
+	observability.Logger(ctx).ErrorContext(ctx, "friendship request failed", "operation", operation, "error", err)
 	return response.Error(http.StatusInternalServerError, "internal_error", "an internal error occurred")
 }
 

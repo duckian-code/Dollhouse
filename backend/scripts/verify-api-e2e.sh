@@ -4,6 +4,7 @@ set -euo pipefail
 stack_name="${STACK_NAME:-dollhouse-dev}"
 region="${AWS_REGION:-us-east-2}"
 suffix="$(date +%s)-$$"
+correlation_id="e2e-$suffix"
 email_a="dollhouse-api-a-${suffix}@example.com"
 email_b="dollhouse-api-b-${suffix}@example.com"
 username_a="api-a-${suffix}"
@@ -120,6 +121,7 @@ request() {
     --write-out '%{http_code}'
     --request "$method"
     --header 'Content-Type: application/json'
+    --header "X-Correlation-Id: $correlation_id"
   )
   [[ -z "$token" ]] || args+=(--header "Authorization: Bearer $token")
   [[ -z "$body" ]] || args+=(--data "$body")
@@ -274,3 +276,4 @@ assert_status "decline friend request as recipient" 204 "$(request POST "/friend
 
 echo "All documented HTTP routes and object-level authorization checks passed against $stack_name ($region)."
 echo "Notification event queued for retry/DLQ verification: $mood_event_id"
+echo "Monitoring correlation ID: $correlation_id"

@@ -69,6 +69,39 @@ sam deploy --parameter-overrides AlertEmail=team@example.com
 An SNS confirmation email must be accepted before alarm notifications are
 delivered. Use a distinct `Environment` parameter for additional stacks.
 
+### Monitoring and request tracing
+
+Every API Lambda writes one JSON lifecycle event with the API Gateway request
+ID, the end-to-end correlation ID, route, status, and duration. The response
+echoes `X-Correlation-Id`; clients may supply that header or let API Gateway's
+request ID become the correlation ID. Notification jobs carry the same ID, so a
+mood publication can be followed into the SQS consumer without logging the
+request body, Cognito claims, mood text, device tokens, or push tokens.
+
+CloudWatch Embedded Metric Format events publish aggregate business metrics in
+the `Dollhouse` namespace: mood updates, notification jobs and recipients,
+delivery attempts and successes, and invalid device tokens. Infrastructure
+alarms send to the SNS alert topic when API 5xx responses reach 5%
+for five minutes, API p95 latency exceeds 1,000 ms for five minutes, the oldest
+notification job exceeds 120 seconds for five minutes, or the DLQ contains a
+message.
+
+The API acceptance test prints its correlation ID. Verify that exact request
+across the synchronous and asynchronous log groups with:
+
+```sh
+make verify-monitoring-trace CORRELATION_ID=<id-from-api-test>
+```
+
+After at least one team member confirms the SNS subscription, exercise the
+alarm action and then restore the alarm to `OK`:
+
+```sh
+make send-test-alert
+```
+
+The command refuses to send unless a confirmed email subscription exists.
+
 ### Mood notification jobs
 
 After `POST /moods` saves the user's current status and history event, the
