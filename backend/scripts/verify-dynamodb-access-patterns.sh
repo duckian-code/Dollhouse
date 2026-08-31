@@ -58,9 +58,6 @@ done
 profile="$(aws dynamodb get-item --region "$region" --table-name "$users_table" --key '{"userId":{"S":"TEST#USER#ALICE"}}' --query 'Item.userId.S' --output text)"
 assert_value "profile lookup" "TEST#USER#ALICE" "$profile"
 
-email_count="$(aws dynamodb query --region "$region" --table-name "$users_table" --index-name EmailIndex --key-condition-expression 'normalizedEmail = :email' --expression-attribute-values '{":email":{"S":"alice@dollhouse.test"}}' --select COUNT --query Count --output text)"
-assert_positive "email lookup" "$email_count"
-
 search_count="$(aws dynamodb query --region "$region" --table-name "$users_table" --index-name UserSearchIndex --key-condition-expression 'searchPartition = :partition AND begins_with(normalizedUsername, :prefix)' --expression-attribute-values '{":partition":{"S":"USER"},":prefix":{"S":"test-a"}}' --select COUNT --query Count --output text)"
 assert_positive "username prefix search" "$search_count"
 

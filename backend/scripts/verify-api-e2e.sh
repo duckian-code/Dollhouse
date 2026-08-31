@@ -9,6 +9,8 @@ email_a="dollhouse-api-a-${suffix}@example.com"
 email_b="dollhouse-api-b-${suffix}@example.com"
 username_a="api-a-${suffix}"
 username_b="api-b-${suffix}"
+renamed_username_a="${username_a}-renamed"
+concurrent_username="api-race-${suffix}"
 password="DollhouseTest!42-${suffix}Aa"
 work_dir="$(mktemp -d)"
 response_file="$work_dir/response.json"
@@ -72,6 +74,9 @@ cleanup() {
     delete_partition "$devices_table" userId deviceId "$sub_b"
     [[ -z "$sub_a" ]] || aws dynamodb delete-item --region "$region" --table-name "$users_table" --key "{\"userId\":{\"S\":\"$sub_a\"}}" --output json >/dev/null
     [[ -z "$sub_b" ]] || aws dynamodb delete-item --region "$region" --table-name "$users_table" --key "{\"userId\":{\"S\":\"$sub_b\"}}" --output json >/dev/null
+    for username in "$username_a" "$username_b" "$renamed_username_a" "$concurrent_username"; do
+      aws dynamodb delete-item --region "$region" --table-name "$users_table" --key "$(jq -cn --arg id "USERNAME#$username" '{userId:{S:$id}}')" --output json >/dev/null
+    done
   fi
 
   [[ "$created_a" != true ]] || aws cognito-idp admin-delete-user --region "$region" --user-pool-id "$user_pool_id" --username "$email_a"
@@ -190,16 +195,47 @@ token_a="$(id_token "$email_a")"
 token_b="$(id_token "$email_b")"
 
 assert_status "create/read profile A" 200 "$(request GET /profile "$token_a")"
-assert_json "profile A ownership" ".data.profile.userId == \"$sub_a\""
+assert_json "profile A requires safe onboarding" ".data.profile.userId == \"$sub_a\" and .data.profile.username == \"\" and .data.profile.displayName == \"\" and .data.profile.onboardingComplete == false and ((tostring | contains(\"@example.com\")) | not)"
 assert_status "create/read profile B" 200 "$(request GET /profile "$token_b")"
-assert_json "profile B ownership" ".data.profile.userId == \"$sub_b\""
+assert_json "profile B requires safe onboarding" ".data.profile.userId == \"$sub_b\" and .data.profile.onboardingComplete == false and ((tostring | contains(\"@example.com\")) | not)"
+
+assert_status "available username" 200 "$(request GET "/users/username-availability?username=$username_a" "$token_a")"
+assert_json "available username response" ".data.username == \"$username_a\" and .data.available == true"
+assert_status "invalid username availability" 400 "$(request GET '/users/username-availability?username=%20%20%20' "$token_a")"
+assert_json "invalid availability error" '.error.code == "validation_failed"'
 
 profile_a="$(jq -cn --arg username "$username_a" '{username:$username,displayName:"API Test A",bio:"temporary verification user"}')"
 profile_b="$(jq -cn --arg username "$username_b" '{username:$username,displayName:"API Test B",bio:null}')"
 assert_status "update profile A" 200 "$(request PUT /profile "$token_a" "$profile_a")"
-assert_json "updated profile A" ".data.profile.username == \"$username_a\" and .data.profile.bio == \"temporary verification user\""
+assert_json "updated profile A" ".data.profile.username == \"$username_a\" and .data.profile.bio == \"temporary verification user\" and .data.profile.onboardingComplete == true"
+assert_status "case-insensitive username collision" 409 "$(request PUT /profile "$token_b" "$(jq -cn --arg username "${username_a^^}" '{username:$username}')")"
+assert_json "username collision error" '.error.code == "conflict"'
+assert_status "claimed username unavailable" 200 "$(request GET "/users/username-availability?username=${username_a^^}" "$token_b")"
+assert_json "claimed availability response" ".data.available == false"
 assert_status "update profile B" 200 "$(request PUT /profile "$token_b" "$profile_b")"
 assert_json "updated profile B" ".data.profile.username == \"$username_b\" and .data.profile.bio == null"
+
+assert_status "rename profile A" 200 "$(request PUT /profile "$token_a" "$(jq -cn --arg username "$renamed_username_a" '{username:$username}')")"
+assert_status "released username available" 200 "$(request GET "/users/username-availability?username=$username_a" "$token_b")"
+assert_json "released availability response" '.data.available == true'
+assert_status "own renamed username available" 200 "$(request GET "/users/username-availability?username=$renamed_username_a" "$token_a")"
+assert_json "own availability response" '.data.available == true'
+assert_status "restore profile A username" 200 "$(request PUT /profile "$token_a" "$(jq -cn --arg username "$username_a" '{username:$username}')")"
+
+race_body="$(jq -cn --arg username "$concurrent_username" '{username:$username}')"
+race_status_a="$work_dir/race-a.status"
+race_status_b="$work_dir/race-b.status"
+curl --silent --show-error --output "$work_dir/race-a.json" --write-out '%{http_code}\n' --request PUT --header 'Content-Type: application/json' --header "Authorization: Bearer $token_a" --data "$race_body" "${api_url}/profile" >"$race_status_a" &
+race_pid_a=$!
+curl --silent --show-error --output "$work_dir/race-b.json" --write-out '%{http_code}\n' --request PUT --header 'Content-Type: application/json' --header "Authorization: Bearer $token_b" --data "$race_body" "${api_url}/profile" >"$race_status_b" &
+race_pid_b=$!
+wait "$race_pid_a"
+wait "$race_pid_b"
+race_statuses="$(sort "$race_status_a" "$race_status_b" | tr '\n' ' ')"
+[[ "$race_statuses" == "200 409 " ]] || { echo "concurrent claim: expected one 200 and one 409, received $race_statuses" >&2; exit 1; }
+echo "concurrent username claim: one winner and one conflict"
+assert_status "restore profile A after race" 200 "$(request PUT /profile "$token_a" "$(jq -cn --arg username "$username_a" '{username:$username}')")"
+assert_status "restore profile B after race" 200 "$(request PUT /profile "$token_b" "$(jq -cn --arg username "$username_b" '{username:$username}')")"
 
 assert_status "asset catalog" 200 "$(request GET /assets/catalog "$token_a")"
 assert_json "asset catalog contract" '.data.catalogVersion != null and (.data.assets | length) > 0'

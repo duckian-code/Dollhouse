@@ -10,6 +10,7 @@ handlers are intentionally thin entry points; reusable behavior belongs in
 | --- | --- | --- |
 | Profile | Get current profile | `cmd/get-current-profile` |
 | Profile | Update profile | `cmd/update-profile` |
+| Profile | Check username availability | `cmd/username-availability` |
 | Doll | Get doll configuration | `cmd/get-doll-configuration` |
 | Doll | Update doll configuration | `cmd/update-doll-configuration` |
 | Assets | Get approved asset catalog | `cmd/get-asset-catalog` |
@@ -59,6 +60,19 @@ Deploy the development stack after reviewing the generated change set:
 ```sh
 sam deploy
 ```
+
+After the first deployment containing username reservations, migrate retained
+pre-onboarding records before accepting traffic from existing users:
+
+```sh
+make migrate-legacy-usernames
+```
+
+The migration removes any legacy public identity derived from Cognito claims,
+removes historical `email`/`normalizedEmail` attributes, marks those profiles
+as `onboardingComplete: false`, and preserves unrelated doll, status, and
+friendship data. It is safe to rerun; profiles already using the new model only
+receive the email-field cleanup.
 
 To enable email notifications, override the empty default on deployment:
 
@@ -230,7 +244,8 @@ Run the HTTP acceptance test against every documented API route:
 make verify-api-e2e
 ```
 
-The API test creates two uniquely named Cognito users, exercises profile, doll,
+The API test creates two uniquely named Cognito users, exercises profile,
+username availability, case collisions, concurrent claims, renames, doll,
 asset, friendship, mood, friend-status, and authorization behavior, then removes
 the exact Cognito users and DynamoDB partitions it created even when a check
 fails. It prints the mood `eventId` whose notification job can be followed

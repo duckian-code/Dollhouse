@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,14 +14,18 @@ import (
 )
 
 type fakeStore struct {
-	profile       Profile
-	doll          *DollConfiguration
-	err           error
-	ensured       []Identity
-	profileUserID string
-	changes       ProfileChanges
-	getDollUserID string
-	dollUserID    string
+	profile                Profile
+	doll                   *DollConfiguration
+	err                    error
+	updateErr              error
+	ensured                []Identity
+	profileUserID          string
+	changes                ProfileChanges
+	available              bool
+	availabilityNormalized string
+	availabilityUserID     string
+	getDollUserID          string
+	dollUserID             string
 }
 
 type fakeAssetValidator struct {
@@ -40,7 +45,15 @@ func (s *fakeStore) EnsureUser(_ context.Context, identity Identity, _ string) (
 
 func (s *fakeStore) UpdateProfile(_ context.Context, userID string, changes ProfileChanges, _ string) (Profile, error) {
 	s.profileUserID, s.changes = userID, changes
+	if s.updateErr != nil {
+		return Profile{}, s.updateErr
+	}
 	return s.profile, s.err
+}
+
+func (s *fakeStore) UsernameAvailable(_ context.Context, normalized, userID string) (bool, error) {
+	s.availabilityNormalized, s.availabilityUserID = normalized, userID
+	return s.available, s.err
 }
 
 func (s *fakeStore) GetDoll(_ context.Context, userID string) (*DollConfiguration, error) {
@@ -157,6 +170,56 @@ func TestUpdateProfileRejectsUnknownAndEmptyUpdates(t *testing.T) {
 		if got.StatusCode != 400 {
 			t.Errorf("body %s: status = %d, response = %s", body, got.StatusCode, got.Body)
 		}
+	}
+}
+
+func TestUsernameAvailabilityUsesCanonicalNormalization(t *testing.T) {
+	store := &fakeStore{available: true}
+	request := authenticatedRequest("")
+	request.QueryStringParameters = map[string]string{"username": "  ALIce  "}
+	got, err := fixedHandlers(store).UsernameAvailability(context.Background(), request)
+	if err != nil || got.StatusCode != http.StatusOK {
+		t.Fatalf("response = %#v, err = %v", got, err)
+	}
+	if store.availabilityNormalized != "alice" || store.availabilityUserID != "user-123" {
+		t.Fatalf("availability lookup = %q, %q", store.availabilityNormalized, store.availabilityUserID)
+	}
+	if !contains(got.Body, `"username":"ALIce"`) || !contains(got.Body, `"available":true`) {
+		t.Fatalf("body = %s", got.Body)
+	}
+}
+
+func TestUsernameAvailabilityAndProfileShareValidation(t *testing.T) {
+	tests := []string{"   ", strings.Repeat("x", 51)}
+	for _, username := range tests {
+		request := authenticatedRequest("")
+		request.QueryStringParameters = map[string]string{"username": username}
+		got, err := fixedHandlers(&fakeStore{}).UsernameAvailability(context.Background(), request)
+		if err != nil || got.StatusCode != http.StatusBadRequest || !jsonErrorCode(got.Body, "validation_failed") {
+			t.Fatalf("username %q: response = %#v, err = %v", username, got, err)
+		}
+	}
+}
+
+func TestUpdateProfileReturnsContractConflict(t *testing.T) {
+	store := &fakeStore{updateErr: &DomainError{Status: http.StatusConflict, Code: "conflict", Message: "username is already in use"}}
+	got, err := fixedHandlers(store).UpdateProfile(context.Background(), authenticatedRequest(`{"username":"Alice"}`))
+	if err != nil || got.StatusCode != http.StatusConflict || !jsonErrorCode(got.Body, "conflict") {
+		t.Fatalf("response = %#v, err = %v", got, err)
+	}
+}
+
+func TestCognitoEmailClaimsNeverSeedPublicProfileFields(t *testing.T) {
+	store := &fakeStore{profile: Profile{UserID: "user-123", OnboardingComplete: false}}
+	request := authenticatedRequest("")
+	request.RequestContext.Authorizer.JWT.Claims["username"] = "login@example.test"
+	request.RequestContext.Authorizer.JWT.Claims["name"] = "login@example.test"
+	got, err := fixedHandlers(store).GetProfile(context.Background(), request)
+	if err != nil || got.StatusCode != http.StatusOK {
+		t.Fatalf("response = %#v, err = %v", got, err)
+	}
+	if len(store.ensured) != 1 || store.ensured[0].UserID != "user-123" || contains(got.Body, "example.test") {
+		t.Fatalf("identity/profile leaked login email: ensured=%#v body=%s", store.ensured, got.Body)
 	}
 }
 

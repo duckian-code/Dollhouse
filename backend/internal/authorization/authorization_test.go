@@ -23,7 +23,7 @@ func TestAuthenticateReadsIdentityAndCognitoGroups(t *testing.T) {
 	if failure != nil {
 		t.Fatalf("failure = %#v", failure)
 	}
-	if principal.Subject != "user-123" || principal.Username != "alice" || principal.DisplayName != "Alice" || !principal.InGroup(UserGroup) || !principal.InGroup(AdminGroup) {
+	if principal.Subject != "user-123" || !principal.InGroup(UserGroup) || !principal.InGroup(AdminGroup) {
 		t.Fatalf("principal = %#v", principal)
 	}
 }
