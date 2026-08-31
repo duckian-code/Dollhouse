@@ -95,8 +95,14 @@ moves them to the encrypted dead-letter queue.
 ### Cognito authorization verification
 
 The API uses the Cognito mobile client's audience and the user pool issuer for
-JWT authorization. After deployment, verify an issued token and rejection paths
-without printing token values:
+JWT authorization. Lambda handlers derive the caller's object identity only from
+API Gateway's verified `sub` claim; request bodies and path parameters cannot
+override it. Cognito's `cognito:groups` claim supplies roles, and administrator
+routes must use the shared `authorization.RequireAdmin` guard. The current asset
+catalog API is read-only, and its Lambda IAM policy has no S3 write permission.
+
+After deployment, verify an issued token and rejection paths without printing
+token values:
 
 ```sh
 VALID_ID_TOKEN="$VALID_ID_TOKEN" EXPIRED_ID_TOKEN="$EXPIRED_ID_TOKEN" \

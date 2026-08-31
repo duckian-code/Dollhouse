@@ -182,6 +182,29 @@ func TestAcceptRequestRejectsSender(t *testing.T) {
 	}
 }
 
+func TestDeclineRequestRejectsNonRecipient(t *testing.T) {
+	outgoing := relationshipItem{UserID: "alice", RelatedUserID: "bob", RequestID: "request-1", Status: StatusPendingOutgoing}
+	client := &fakeDynamoDB{queryOutputs: []*dynamodb.QueryOutput{{Items: []map[string]types.AttributeValue{marshalItem(t, outgoing)}}}}
+	err := NewDynamoDBStore(client, "users", "friendships").DeclineRequest(context.Background(), "alice", "request-1")
+	var domain *DomainError
+	if !errors.As(err, &domain) || domain.Status != http.StatusForbidden || domain.Code != "forbidden" || client.transactInput != nil {
+		t.Fatalf("err=%v transaction=%#v", err, client.transactInput)
+	}
+}
+
+func TestRemoveFriendCannotDeleteAnotherUsersRelationship(t *testing.T) {
+	client := &fakeDynamoDB{getOutputs: []*dynamodb.GetItemOutput{{}}}
+	err := NewDynamoDBStore(client, "users", "friendships").RemoveFriend(context.Background(), "alice", "stranger")
+	var domain *DomainError
+	if !errors.As(err, &domain) || domain.Status != http.StatusNotFound || domain.Code != "not_found" || client.transactInput != nil {
+		t.Fatalf("err=%v transaction=%#v", err, client.transactInput)
+	}
+	key := client.getInputs[0].Key
+	if key["userId"].(*types.AttributeValueMemberS).Value != "alice" || key["relatedUserId"].(*types.AttributeValueMemberS).Value != "stranger" {
+		t.Fatalf("key=%#v", key)
+	}
+}
+
 func TestDeclineAndRemoveDeleteMirroredRecordsAtomically(t *testing.T) {
 	incoming := relationshipItem{UserID: "bob", RelatedUserID: "alice", RequestID: "request-1", Status: StatusPendingIncoming}
 	client := &fakeDynamoDB{queryOutputs: []*dynamodb.QueryOutput{{Items: []map[string]types.AttributeValue{marshalItem(t, incoming)}}}}

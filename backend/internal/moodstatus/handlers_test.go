@@ -124,6 +124,22 @@ func TestPublishMoodValidatesAuthenticationBodyAndSliders(t *testing.T) {
 	}
 }
 
+func TestEveryMoodAndStatusRouteRequiresAuthentication(t *testing.T) {
+	handlers := fixedHandlers(&fakeStore{})
+	tests := map[string]func(context.Context, events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error){
+		"POST /moods":          handlers.PublishMood,
+		"GET /friend-statuses": handlers.GetFriendStatuses,
+	}
+	for name, invoke := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := invoke(context.Background(), events.APIGatewayV2HTTPRequest{})
+			if err != nil || got.StatusCode != http.StatusUnauthorized || errorCode(got.Body) != "unauthenticated" {
+				t.Fatalf("response = %#v, err = %v", got, err)
+			}
+		})
+	}
+}
+
 func TestGetFriendStatusesReturnsPaginationShape(t *testing.T) {
 	stress := 2
 	store := &fakeStore{nextToken: "next", items: []FriendStatus{{

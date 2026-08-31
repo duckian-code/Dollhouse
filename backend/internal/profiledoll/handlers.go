@@ -16,6 +16,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/dollhouse-app/dollhouse/backend/internal/assetcatalog"
+	"github.com/dollhouse-app/dollhouse/backend/internal/authorization"
 	"github.com/dollhouse-app/dollhouse/backend/pkg/response"
 )
 
@@ -177,28 +178,11 @@ func (h *Handlers) UpdateDoll(ctx context.Context, request events.APIGatewayV2HT
 }
 
 func identityFrom(request events.APIGatewayV2HTTPRequest) (Identity, *events.APIGatewayV2HTTPResponse) {
-	if request.RequestContext.Authorizer == nil || request.RequestContext.Authorizer.JWT == nil {
-		failure := response.Error(http.StatusUnauthorized, "unauthenticated", "valid Cognito authentication is required")
-		return Identity{}, &failure
+	principal, failure := authorization.Authenticate(request)
+	if failure != nil {
+		return Identity{}, failure
 	}
-	claims := request.RequestContext.Authorizer.JWT.Claims
-	userID := strings.TrimSpace(claims["sub"])
-	if userID == "" {
-		failure := response.Error(http.StatusUnauthorized, "unauthenticated", "valid Cognito authentication is required")
-		return Identity{}, &failure
-	}
-	username := strings.TrimSpace(claims["username"])
-	if username == "" {
-		username = strings.TrimSpace(claims["cognito:username"])
-	}
-	if username == "" {
-		username = userID
-	}
-	displayName := strings.TrimSpace(claims["name"])
-	if displayName == "" {
-		displayName = username
-	}
-	return Identity{UserID: userID, Username: username, DisplayName: displayName}, nil
+	return Identity{UserID: principal.Subject, Username: principal.Username, DisplayName: principal.DisplayName}, nil
 }
 
 func decodeBody(request events.APIGatewayV2HTTPRequest, target any) *events.APIGatewayV2HTTPResponse {

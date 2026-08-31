@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -101,6 +102,24 @@ func TestGetProfileRequiresVerifiedClaims(t *testing.T) {
 	}
 	if got.StatusCode != 401 || !jsonErrorCode(got.Body, "unauthenticated") {
 		t.Fatalf("response = %#v", got)
+	}
+}
+
+func TestEveryProfileAndDollRouteRequiresAuthentication(t *testing.T) {
+	handlers := fixedHandlers(&fakeStore{})
+	tests := map[string]func(context.Context, events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error){
+		"GET /profile": handlers.GetProfile,
+		"PUT /profile": handlers.UpdateProfile,
+		"GET /doll":    handlers.GetDoll,
+		"PUT /doll":    handlers.UpdateDoll,
+	}
+	for name, invoke := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := invoke(context.Background(), events.APIGatewayV2HTTPRequest{})
+			if err != nil || got.StatusCode != http.StatusUnauthorized || !jsonErrorCode(got.Body, "unauthenticated") {
+				t.Fatalf("response = %#v, err = %v", got, err)
+			}
+		})
 	}
 }
 
