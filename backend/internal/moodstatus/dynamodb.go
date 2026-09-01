@@ -182,12 +182,9 @@ func (s *DynamoDBStore) ListFriendStatuses(ctx context.Context, userID, token st
 		if !ok {
 			return nil, "", fmt.Errorf("accepted friendship references missing user %q", relationship.RelatedUserID)
 		}
-		if user.DollConfiguration == nil {
-			return nil, "", fmt.Errorf("accepted friend %q has no doll configuration", relationship.RelatedUserID)
-		}
 		items = append(items, FriendStatus{
 			Friend: UserSummary{UserID: user.UserID, Username: user.Username, DisplayName: user.DisplayName},
-			Doll:   *user.DollConfiguration, Status: user.CurrentStatus,
+			Doll:   user.DollConfiguration, Status: user.CurrentStatus,
 		})
 	}
 	nextToken := ""

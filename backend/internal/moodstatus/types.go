@@ -32,11 +32,11 @@ type DollConfiguration struct {
 	UpdatedAt        string   `json:"updatedAt" dynamodbav:"updatedAt"`
 }
 
-// FriendStatus combines the friend's public identity, doll, and current status.
+// FriendStatus combines the friend's public identity, optional doll, and current status.
 type FriendStatus struct {
-	Friend UserSummary       `json:"friend"`
-	Doll   DollConfiguration `json:"doll"`
-	Status *MoodState        `json:"status"`
+	Friend UserSummary        `json:"friend"`
+	Doll   *DollConfiguration `json:"doll,omitempty"`
+	Status *MoodState         `json:"status"`
 }
 
 // Store is the persistence boundary used by mood and status handlers.

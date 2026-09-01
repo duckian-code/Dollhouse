@@ -113,7 +113,7 @@ export interface PublishMoodRequest {
 
 export interface FriendStatus {
   friend: UserSummary;
-  doll: DollConfiguration;
+  doll?: DollConfiguration;
   status: MoodState | null;
 }
 
