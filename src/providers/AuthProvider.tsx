@@ -14,7 +14,6 @@ import {
   login as cognitoLogin,
   logout as cognitoLogout,
 } from '@/services/auth/cognito';
-import { loadProfile } from '@/services/cache/dollhouse';
 import {
   clearAccountCache,
   initializeCache,
@@ -73,18 +72,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
     setIsAuthenticated(true);
     setSessionMessage(null);
-
-    void loadProfile()
-      .then(({ refresh }) => refresh)
-      .catch((error: unknown) => {
-        if (__DEV__) {
-          const details =
-            error instanceof Error
-              ? { name: error.name, message: error.message }
-              : { name: 'UnknownError' };
-          console.warn('Profile bootstrap failed after sign-in.', details);
-        }
-      });
   }, []);
 
   const logout = useCallback(async () => {

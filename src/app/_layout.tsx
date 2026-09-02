@@ -14,6 +14,7 @@ import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { FriendManagementProvider } from '@/providers/FriendManagementProvider';
 import { FriendStatusFeedProvider } from '@/providers/FriendStatusFeedProvider';
 import { MoodStatusProvider } from '@/providers/MoodStatusProvider';
+import { ProfileProvider, useProfile } from '@/providers/ProfileProvider';
 import { ResilienceProvider } from '@/providers/ResilienceProvider';
 import { tokens } from '@/theme/tokens';
 
@@ -32,14 +33,16 @@ export default function RootLayout() {
   return (
     <ResilienceProvider>
       <AuthProvider>
-        <ApplicationBanner />
-        <MoodStatusProvider>
-          <FriendManagementProvider>
-            <FriendStatusFeedProvider>
-              <RootNavigator />
-            </FriendStatusFeedProvider>
-          </FriendManagementProvider>
-        </MoodStatusProvider>
+        <ProfileProvider>
+          <ApplicationBanner />
+          <MoodStatusProvider>
+            <FriendManagementProvider>
+              <FriendStatusFeedProvider>
+                <RootNavigator />
+              </FriendStatusFeedProvider>
+            </FriendManagementProvider>
+          </MoodStatusProvider>
+        </ProfileProvider>
         <StatusBar style="light" />
       </AuthProvider>
     </ResilienceProvider>
@@ -48,10 +51,20 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
+  const {
+    profile,
+    isLoading: isProfileLoading,
+    error: profileError,
+  } = useProfile();
 
-  if (isLoading) {
+  if (isLoading || (isAuthenticated && isProfileLoading && !profileError)) {
     return <LoadingScreen label="Restoring your session" />;
   }
+
+  const hasCompletedOnboarding = profile?.onboardingComplete === true;
+  const canUseMainApp =
+    (__DEV__ && !isAuthenticated) ||
+    (isAuthenticated && hasCompletedOnboarding);
 
   return (
     <Stack
@@ -63,10 +76,13 @@ function RootNavigator() {
       <Stack.Protected guard={!isAuthenticated}>
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
-      <Stack.Protected guard={__DEV__ || isAuthenticated}>
+      <Stack.Protected guard={isAuthenticated && !hasCompletedOnboarding}>
+        <Stack.Screen name="onboarding" />
+      </Stack.Protected>
+      <Stack.Protected guard={canUseMainApp}>
         <Stack.Screen name="(tabs)" />
       </Stack.Protected>
-      <Stack.Protected guard={__DEV__ || isAuthenticated}>
+      <Stack.Protected guard={canUseMainApp}>
         <Stack.Screen
           name="friend-search"
           options={{ animation: 'slide_from_right' }}
@@ -79,7 +95,7 @@ function RootNavigator() {
           }}
         />
       </Stack.Protected>
-      <Stack.Protected guard={__DEV__ || isAuthenticated}>
+      <Stack.Protected guard={canUseMainApp}>
         <Stack.Screen
           name="avatar-customization"
           options={{ animation: 'slide_from_right' }}

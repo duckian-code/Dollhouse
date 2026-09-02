@@ -3,12 +3,15 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
+import { ProfileForm } from '@/components/profile/ProfileForm';
 import { SectionHeader } from '@/components/SectionHeader';
 import { useAuth } from '@/providers/AuthProvider';
+import { useProfile } from '@/providers/ProfileProvider';
 import { tokens } from '@/theme/tokens';
 
 export default function ProfileScreen() {
   const { logout } = useAuth();
+  const { profile, update } = useProfile();
 
   return (
     <AppScreen>
@@ -24,10 +27,20 @@ export default function ProfileScreen() {
         >
           <Text style={styles.avatarText}>○</Text>
         </View>
-        <Text style={styles.name}>Dollhouse resident</Text>
+        <Text style={styles.name}>{profile?.displayName}</Text>
+        <Text style={styles.username}>@{profile?.username}</Text>
         <Text style={styles.detail}>
-          Make your Dollhouse resident your own.
+          {profile?.bio ?? 'Make your Dollhouse resident your own.'}
         </Text>
+      </AppCard>
+      <AppCard style={styles.editor}>
+        <Text style={styles.editorTitle}>Edit profile</Text>
+        <ProfileForm
+          includeBio
+          initialProfile={profile}
+          onSave={update}
+          submitLabel="Save profile"
+        />
       </AppCard>
       <Link href="/avatar-customization" asChild>
         <Pressable
@@ -75,6 +88,19 @@ const styles = StyleSheet.create({
     fontFamily: tokens.typography.bodyRegular,
     fontSize: 16,
     textAlign: 'center',
+  },
+  username: {
+    marginTop: tokens.spacing.xs,
+    color: tokens.color.highlight,
+    fontFamily: tokens.typography.bodySemibold,
+    fontSize: 15,
+  },
+  editor: { marginTop: tokens.spacing.lg },
+  editorTitle: {
+    marginBottom: tokens.spacing.md,
+    color: tokens.color.text,
+    fontFamily: tokens.typography.headingBold,
+    fontSize: 19,
   },
   signOut: {
     minHeight: 52,
