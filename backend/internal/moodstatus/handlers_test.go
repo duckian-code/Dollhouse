@@ -16,6 +16,8 @@ type fakeStore struct {
 	publishedEvent  string
 	publishedState  MoodState
 	items           []FriendStatus
+	moodItems       []MoodEntry
+	moodNextToken   string
 	nextToken       string
 	requestedToken  string
 	err             error
@@ -31,6 +33,11 @@ func (s *fakeStore) PublishMood(_ context.Context, userID, eventID string, state
 func (s *fakeStore) ListFriendStatuses(_ context.Context, userID, token string) ([]FriendStatus, string, error) {
 	s.publishedUserID, s.requestedToken = userID, token
 	return s.items, s.nextToken, s.err
+}
+
+func (s *fakeStore) ListMoods(_ context.Context, userID, token string) ([]MoodEntry, string, error) {
+	s.publishedUserID, s.requestedToken = userID, token
+	return s.moodItems, s.moodNextToken, s.err
 }
 
 func (s *fakeStore) ListNotificationRecipientIDs(_ context.Context, _ string) ([]string, error) {
@@ -128,6 +135,7 @@ func TestEveryMoodAndStatusRouteRequiresAuthentication(t *testing.T) {
 	handlers := fixedHandlers(&fakeStore{})
 	tests := map[string]func(context.Context, events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error){
 		"POST /moods":          handlers.PublishMood,
+		"GET /moods":           handlers.GetMoods,
 		"GET /friend-statuses": handlers.GetFriendStatuses,
 	}
 	for name, invoke := range tests {
@@ -137,6 +145,46 @@ func TestEveryMoodAndStatusRouteRequiresAuthentication(t *testing.T) {
 				t.Fatalf("response = %#v, err = %v", got, err)
 			}
 		})
+	}
+}
+
+func TestGetMoodsReturnsPaginationShape(t *testing.T) {
+	stress := 2
+	store := &fakeStore{moodNextToken: "next", moodItems: []MoodEntry{{
+		EventID: "event-1",
+		MoodState: MoodState{
+			Status: "okay", Stress: &stress, UpdatedAt: "2026-08-16T18:30:45Z",
+		},
+	}}}
+	request := authenticatedRequest("")
+	request.QueryStringParameters = map[string]string{"nextToken": "prior"}
+	got, _ := fixedHandlers(store).GetMoods(context.Background(), request)
+	if got.StatusCode != http.StatusOK || store.publishedUserID != "user-123" || store.requestedToken != "prior" {
+		t.Fatalf("response=%#v store=%#v", got, store)
+	}
+	var body struct {
+		Data struct {
+			Items     []MoodEntry `json:"items"`
+			NextToken *string     `json:"nextToken"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(got.Body), &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Data.Items) != 1 || body.Data.Items[0].EventID != "event-1" || body.Data.NextToken == nil || *body.Data.NextToken != "next" {
+		t.Fatalf("body=%#v", body)
+	}
+}
+
+func TestGetMoodsReturnsNullNextTokenWhenHistoryEnds(t *testing.T) {
+	got, _ := fixedHandlers(&fakeStore{}).GetMoods(context.Background(), authenticatedRequest(""))
+	var body struct {
+		Data struct {
+			NextToken *string `json:"nextToken"`
+		} `json:"data"`
+	}
+	if got.StatusCode != http.StatusOK || json.Unmarshal([]byte(got.Body), &body) != nil || body.Data.NextToken != nil {
+		t.Fatalf("response=%#v body=%#v", got, body)
 	}
 }
 

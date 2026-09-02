@@ -1,4 +1,4 @@
-// Package moodstatus implements mood publishing and accepted-friend status reads.
+// Package moodstatus implements mood publishing and authenticated status reads.
 package moodstatus
 
 import "context"
@@ -12,6 +12,12 @@ type MoodState struct {
 	Fatigue    *int   `json:"fatigue" dynamodbav:"fatigue"`
 	Discomfort *int   `json:"discomfort" dynamodbav:"discomfort"`
 	UpdatedAt  string `json:"updatedAt" dynamodbav:"updatedAt"`
+}
+
+// MoodEntry is a persisted mood event in the authenticated user's history.
+type MoodEntry struct {
+	EventID string `json:"eventId" dynamodbav:"eventId"`
+	MoodState
 }
 
 // UserSummary is the public identity included with a friend's status.
@@ -42,6 +48,7 @@ type FriendStatus struct {
 // Store is the persistence boundary used by mood and status handlers.
 type Store interface {
 	PublishMood(context.Context, string, string, MoodState) error
+	ListMoods(context.Context, string, string) ([]MoodEntry, string, error)
 	ListNotificationRecipientIDs(context.Context, string) ([]string, error)
 	ListFriendStatuses(context.Context, string, string) ([]FriendStatus, string, error)
 }

@@ -117,6 +117,57 @@ func TestPublishMoodMapsMissingProfileCondition(t *testing.T) {
 	}
 }
 
+func TestListMoodsQueriesOwnHistoryNewestFirstAndPaginates(t *testing.T) {
+	stress := 4
+	first := moodEvent{UserID: "self", OccurredAt: "2026-08-16T18:30:45Z#event-2", EventID: "event-2", MoodState: MoodState{Status: "calm", Stress: &stress, UpdatedAt: "2026-08-16T18:30:45Z"}}
+	second := moodEvent{UserID: "self", OccurredAt: "2026-08-15T18:30:45Z#event-1", EventID: "event-1", MoodState: MoodState{Status: "tired", UpdatedAt: "2026-08-15T18:30:45Z"}}
+	client := &fakeDynamoDB{queryOutput: &dynamodb.QueryOutput{
+		Items: []map[string]types.AttributeValue{marshalItem(t, first), marshalItem(t, second)},
+		LastEvaluatedKey: map[string]types.AttributeValue{
+			"userId": &types.AttributeValueMemberS{Value: "self"}, "occurredAt": &types.AttributeValueMemberS{Value: second.OccurredAt},
+		},
+	}}
+	items, token, err := NewDynamoDBStore(client, "users", "friendships", "moods").ListMoods(context.Background(), "self", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 || items[0].EventID != "event-2" || items[1].EventID != "event-1" || token == "" {
+		t.Fatalf("items=%#v token=%q", items, token)
+	}
+	if client.queryInput.ScanIndexForward == nil || *client.queryInput.ScanIndexForward || client.queryInput.Limit == nil || *client.queryInput.Limit != statusPageSize || client.queryInput.IndexName != nil {
+		t.Fatalf("query=%#v", client.queryInput)
+	}
+	queriedUser := client.queryInput.ExpressionAttributeValues[":userId"].(*types.AttributeValueMemberS).Value
+	if queriedUser != "self" {
+		t.Fatalf("queried user=%q", queriedUser)
+	}
+	decoded, err := decodeMoodPageToken(token)
+	if err != nil || decoded.UserID != "self" || decoded.OccurredAt != second.OccurredAt {
+		t.Fatalf("decoded=%#v err=%v", decoded, err)
+	}
+}
+
+func TestListMoodsUsesScopedTokenAndRejectsInvalidTokens(t *testing.T) {
+	valid := mustMoodToken(t, moodPageToken{UserID: "self", OccurredAt: "2026-08-15T18:30:45Z#event-1"})
+	client := &fakeDynamoDB{}
+	store := NewDynamoDBStore(client, "users", "friendships", "moods")
+	if _, _, err := store.ListMoods(context.Background(), "self", valid); err != nil {
+		t.Fatal(err)
+	}
+	key := client.queryInput.ExclusiveStartKey
+	if key["userId"].(*types.AttributeValueMemberS).Value != "self" || key["occurredAt"].(*types.AttributeValueMemberS).Value != "2026-08-15T18:30:45Z#event-1" {
+		t.Fatalf("key=%#v", key)
+	}
+	for _, token := range []string{"not-a-token", mustMoodToken(t, moodPageToken{UserID: "other", OccurredAt: "timestamp"})} {
+		client.queryInput = nil
+		_, _, err := store.ListMoods(context.Background(), "self", token)
+		var domain *DomainError
+		if !errors.As(err, &domain) || domain.Status != http.StatusBadRequest || client.queryInput != nil {
+			t.Fatalf("token=%q err=%v query=%#v", token, err, client.queryInput)
+		}
+	}
+}
+
 func TestListFriendStatusesQueriesAcceptedRelationshipsAndPreservesOrder(t *testing.T) {
 	firstRelation := relationshipItem{UserID: "self", RelatedUserID: "friend-2", StatusRelatedUserID: "ACCEPTED#friend-2"}
 	secondRelation := relationshipItem{UserID: "self", RelatedUserID: "friend-1", StatusRelatedUserID: "ACCEPTED#friend-1"}
@@ -190,6 +241,15 @@ func TestListFriendStatusesRejectsInvalidOrCrossUserTokenBeforeQuery(t *testing.
 func mustToken(t *testing.T, token pageToken) string {
 	t.Helper()
 	encoded, err := encodePageToken(token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
+}
+
+func mustMoodToken(t *testing.T, token moodPageToken) string {
+	t.Helper()
+	encoded, err := encodeMoodPageToken(token)
 	if err != nil {
 		t.Fatal(err)
 	}
