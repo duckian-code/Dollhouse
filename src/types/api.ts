@@ -122,7 +122,6 @@ export interface FriendStatus {
 }
 
 export type FriendStatusesResponse = PaginatedResponse<FriendStatus>;
-export type MoodEntriesResponse = PaginatedResponse<MoodEntry>;
 
 export type ProfileResponse = ApiResponse<{ profile: Profile }>;
 export type UsernameAvailabilityResponse = ApiResponse<{

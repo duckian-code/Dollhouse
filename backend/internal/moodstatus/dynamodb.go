@@ -153,8 +153,6 @@ func (s *DynamoDBStore) ListMoods(ctx context.Context, userID, token string) ([]
 	}
 	input := &dynamodb.QueryInput{
 		TableName:              &s.moodEventsTable,
-		Limit:                  int32ptr(statusPageSize),
-		ScanIndexForward:       boolptr(false),
 		KeyConditionExpression: strptr("userId = :userId"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":userId": &types.AttributeValueMemberS{Value: userID},
