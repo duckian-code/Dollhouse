@@ -16,6 +16,7 @@ import (
 const (
 	userStatusIndex = "UserStatusIndex"
 	statusPageSize  = 25
+	moodPageSize    = 25
 )
 
 type dynamodbAPI interface {
@@ -158,6 +159,8 @@ func (s *DynamoDBStore) ListMoods(ctx context.Context, userID, token string) ([]
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":userId": &types.AttributeValueMemberS{Value: userID},
 		},
+		Limit:            int32ptr(moodPageSize),
+		ScanIndexForward: boolptr(false),
 	}
 	if token != "" {
 		decoded, err := decodeMoodPageToken(token)

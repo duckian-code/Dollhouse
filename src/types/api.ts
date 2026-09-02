@@ -145,3 +145,4 @@ export type PublishMoodResponse = ApiResponse<{
   eventId: string;
   status: MoodState;
 }>;
+export type MoodEntriesResponse = PaginatedResponse<MoodEntry>;

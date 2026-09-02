@@ -120,7 +120,7 @@ export default function CheckInScreen() {
           </Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.back()}
+            onPress={() => router.dismissTo('/(tabs)')}
             style={styles.primaryButton}
           >
             <Text style={styles.primaryButtonText}>Done</Text>
@@ -136,7 +136,7 @@ export default function CheckInScreen() {
         <Pressable
           accessibilityRole="button"
           hitSlop={8}
-          onPress={() => router.back()}
+          onPress={() => router.dismissTo('/(tabs)')}
           style={styles.closeButton}
         >
           <Text style={styles.closeText}>Cancel</Text>
