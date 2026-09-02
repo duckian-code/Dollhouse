@@ -103,7 +103,7 @@ export function publishMood(request: PublishMoodRequest) {
   );
 }
 
-export function getMoods(nextToken?: string) {
+export function getMoodEntries(nextToken?: string) {
   const params = new URLSearchParams();
   if (nextToken) params.set('nextToken', nextToken);
   const query = params.size ? `?${params.toString()}` : '';

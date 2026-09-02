@@ -190,7 +190,7 @@ function StateDetails({ entry }: { entry: MoodEntry }) {
 
 const styles = StyleSheet.create({
   list: { gap: tokens.spacing.md },
-  status: {
+  title: {
     color: tokens.color.text,
     fontFamily: tokens.typography.headingBold,
     fontSize: 19,
@@ -228,30 +228,6 @@ const styles = StyleSheet.create({
     marginTop: tokens.spacing.sm,
     color: tokens.color.textMuted,
     fontFamily: tokens.typography.bodyRegular,
-    fontSize: 15,
-  },
-  details: {
-    marginTop: tokens.spacing.sm,
-    color: tokens.color.text,
-    fontFamily: tokens.typography.bodySemibold,
-    fontSize: 16,
-  },
-  error: {
-    color: tokens.color.secondaryAccent,
-    fontFamily: tokens.typography.bodySemibold,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  loadMore: {
-    minHeight: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: tokens.radius.round,
-    backgroundColor: tokens.color.accent,
-  },
-  loadMoreText: {
-    color: tokens.color.onAccent,
-    fontFamily: tokens.typography.headingBold,
     fontSize: 16,
   },
 });

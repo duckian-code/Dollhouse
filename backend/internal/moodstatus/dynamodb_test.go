@@ -134,7 +134,7 @@ func TestListMoodsQueriesOwnHistoryNewestFirstAndPaginates(t *testing.T) {
 	if len(items) != 2 || items[0].EventID != "event-2" || items[1].EventID != "event-1" || token == "" {
 		t.Fatalf("items=%#v token=%q", items, token)
 	}
-	if client.queryInput.ScanIndexForward == nil || *client.queryInput.ScanIndexForward || client.queryInput.Limit == nil || *client.queryInput.Limit != statusPageSize || client.queryInput.IndexName != nil {
+	if client.queryInput.ScanIndexForward == nil || *client.queryInput.ScanIndexForward || client.queryInput.Limit == nil || *client.queryInput.Limit != moodPageSize || client.queryInput.IndexName != nil {
 		t.Fatalf("query=%#v", client.queryInput)
 	}
 	queriedUser := client.queryInput.ExpressionAttributeValues[":userId"].(*types.AttributeValueMemberS).Value
