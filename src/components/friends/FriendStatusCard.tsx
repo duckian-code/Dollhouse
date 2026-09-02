@@ -79,7 +79,7 @@ export function FriendStatusCard({ item, catalog }: FriendStatusCardProps) {
         ) : null}
       </View>
 
-      {catalog ? (
+      {catalog && item.doll ? (
         <FriendDollhouse
           catalog={catalog}
           doll={item.doll}
@@ -87,7 +87,9 @@ export function FriendStatusCard({ item, catalog }: FriendStatusCardProps) {
         />
       ) : (
         <View style={styles.artLoading}>
-          <Text style={styles.privateCopy}>Avatar art is loading…</Text>
+          <Text style={styles.privateCopy}>
+            {item.doll ? 'Avatar art is loading…' : 'No doll created yet.'}
+          </Text>
         </View>
       )}
 

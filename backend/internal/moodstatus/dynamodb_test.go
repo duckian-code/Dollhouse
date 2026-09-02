@@ -141,6 +141,9 @@ func TestListFriendStatusesQueriesAcceptedRelationshipsAndPreservesOrder(t *test
 	if len(items) != 2 || items[0].Friend.UserID != "friend-2" || items[1].Friend.UserID != "friend-1" || token == "" {
 		t.Fatalf("items=%#v token=%q", items, token)
 	}
+	if items[0].Doll == nil || items[0].Doll.BodyAssetID != "body-2" || items[1].Doll == nil || items[1].Doll.BodyAssetID != "body-1" {
+		t.Fatalf("items=%#v", items)
+	}
 	if client.queryInput.IndexName == nil || *client.queryInput.IndexName != userStatusIndex || client.queryInput.Limit == nil || *client.queryInput.Limit != statusPageSize {
 		t.Fatalf("query=%#v", client.queryInput)
 	}
@@ -151,6 +154,24 @@ func TestListFriendStatusesQueriesAcceptedRelationshipsAndPreservesOrder(t *test
 	decoded, err := decodePageToken(token)
 	if err != nil || decoded.UserID != "self" || decoded.RelatedUserID != "friend-1" {
 		t.Fatalf("decoded=%#v err=%v", decoded, err)
+	}
+}
+
+func TestListFriendStatusesAllowsFriendWithoutDollConfiguration(t *testing.T) {
+	relation := relationshipItem{UserID: "self", RelatedUserID: "friend-1", StatusRelatedUserID: "ACCEPTED#friend-1"}
+	client := &fakeDynamoDB{
+		queryOutput: &dynamodb.QueryOutput{Items: []map[string]types.AttributeValue{marshalItem(t, relation)}},
+		batchOutputs: []*dynamodb.BatchGetItemOutput{{Responses: map[string][]map[string]types.AttributeValue{
+			"users": {marshalItem(t, userItem{UserID: "friend-1", Username: "one", DisplayName: "One"})},
+		}}},
+	}
+
+	items, token, err := NewDynamoDBStore(client, "users", "friendships", "moods").ListFriendStatuses(context.Background(), "self", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Friend.UserID != "friend-1" || items[0].Doll != nil || token != "" {
+		t.Fatalf("items=%#v token=%q", items, token)
 	}
 }
 

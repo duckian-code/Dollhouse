@@ -142,9 +142,10 @@ func TestEveryMoodAndStatusRouteRequiresAuthentication(t *testing.T) {
 
 func TestGetFriendStatusesReturnsPaginationShape(t *testing.T) {
 	stress := 2
+	doll := &DollConfiguration{BodyAssetID: "body", ClothingAssetIDs: []string{}}
 	store := &fakeStore{nextToken: "next", items: []FriendStatus{{
 		Friend: UserSummary{UserID: "friend-1", Username: "alex", DisplayName: "Alex"},
-		Doll:   DollConfiguration{BodyAssetID: "body", ClothingAssetIDs: []string{}},
+		Doll:   doll,
 		Status: &MoodState{Status: "okay", Stress: &stress, UpdatedAt: "2026-08-16T18:30:45Z"},
 	}}}
 	request := authenticatedRequest("")
@@ -164,6 +165,34 @@ func TestGetFriendStatusesReturnsPaginationShape(t *testing.T) {
 	}
 	if len(body.Data.Items) != 1 || body.Data.NextToken == nil || *body.Data.NextToken != "next" {
 		t.Fatalf("body=%#v", body)
+	}
+}
+
+func TestGetFriendStatusesOmitsMissingDollConfiguration(t *testing.T) {
+	store := &fakeStore{items: []FriendStatus{{
+		Friend: UserSummary{UserID: "friend-1", Username: "alex", DisplayName: "Alex"},
+	}}}
+
+	got, err := fixedHandlers(store).GetFriendStatuses(context.Background(), authenticatedRequest(""))
+	if err != nil || got.StatusCode != http.StatusOK {
+		t.Fatalf("response=%#v err=%v", got, err)
+	}
+	var body struct {
+		Data struct {
+			Items []map[string]json.RawMessage `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(got.Body), &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Data.Items) != 1 {
+		t.Fatalf("body=%#v", body)
+	}
+	if _, exists := body.Data.Items[0]["doll"]; exists {
+		t.Fatalf("doll should be omitted: %s", got.Body)
+	}
+	if status, exists := body.Data.Items[0]["status"]; !exists || string(status) != "null" {
+		t.Fatalf("status should remain explicit null: %s", got.Body)
 	}
 }
 
