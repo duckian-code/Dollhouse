@@ -93,6 +93,23 @@ func (h *Handlers) PublishMood(ctx context.Context, request events.APIGatewayV2H
 	return response.JSON(http.StatusCreated, map[string]any{"data": map[string]any{"eventId": eventID, "status": state}})
 }
 
+// GetMoodEntries returns the signed-in user's saved mood history.
+func (h *Handlers) GetMoodEntries(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	userID, failure := authenticatedUserID(request)
+	if failure != nil {
+		return *failure, nil
+	}
+	items, nextToken, err := h.store.ListMoodEntries(ctx, userID, request.QueryStringParameters["nextToken"])
+	if err != nil {
+		return h.failure(ctx, "get mood entries", err), nil
+	}
+	var token any
+	if nextToken != "" {
+		token = nextToken
+	}
+	return response.JSON(http.StatusOK, map[string]any{"data": map[string]any{"items": items, "nextToken": token}})
+}
+
 // GetFriendStatuses returns the current state of accepted friends only.
 func (h *Handlers) GetFriendStatuses(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	userID, failure := authenticatedUserID(request)

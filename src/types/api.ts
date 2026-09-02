@@ -104,6 +104,10 @@ export interface MoodState {
   updatedAt: ISODateTime;
 }
 
+export interface MoodEntry extends MoodState {
+  eventId: string;
+}
+
 export interface PublishMoodRequest {
   status: string;
   stress?: number | null;
@@ -140,3 +144,4 @@ export type PublishMoodResponse = ApiResponse<{
   eventId: string;
   status: MoodState;
 }>;
+export type MoodEntriesResponse = PaginatedResponse<MoodEntry>;

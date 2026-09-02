@@ -14,6 +14,12 @@ type MoodState struct {
 	UpdatedAt  string `json:"updatedAt" dynamodbav:"updatedAt"`
 }
 
+// MoodEntry is one saved mood event in the signed-in user's history.
+type MoodEntry struct {
+	EventID string `json:"eventId" dynamodbav:"eventId"`
+	MoodState
+}
+
 // UserSummary is the public identity included with a friend's status.
 type UserSummary struct {
 	UserID      string `json:"userId" dynamodbav:"userId"`
@@ -42,6 +48,7 @@ type FriendStatus struct {
 // Store is the persistence boundary used by mood and status handlers.
 type Store interface {
 	PublishMood(context.Context, string, string, MoodState) error
+	ListMoodEntries(context.Context, string, string) ([]MoodEntry, string, error)
 	ListNotificationRecipientIDs(context.Context, string) ([]string, error)
 	ListFriendStatuses(context.Context, string, string) ([]FriendStatus, string, error)
 }

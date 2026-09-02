@@ -364,6 +364,22 @@ Resources:
             Path: /moods
             Method: POST
 
+  GetMoodEntriesFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MoodEventsTable
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DollhouseApi
+            Path: /moods
+            Method: GET
+
   GetFriendStatusesFunction:
     Type: AWS::Serverless::Function
     Metadata:

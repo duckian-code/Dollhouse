@@ -117,6 +117,50 @@ func TestPublishMoodMapsMissingProfileCondition(t *testing.T) {
 	}
 }
 
+func TestListMoodEntriesQueriesSignedInUserNewestFirst(t *testing.T) {
+	stress := 3
+	client := &fakeDynamoDB{queryOutput: &dynamodb.QueryOutput{
+		Items: []map[string]types.AttributeValue{
+			marshalItem(t, moodEvent{UserID: "self", OccurredAt: "2026-09-01T18:00:00Z#event-2", EventID: "event-2", MoodState: MoodState{Status: "great", Stress: &stress, UpdatedAt: "2026-09-01T18:00:00Z"}}),
+			marshalItem(t, moodEvent{UserID: "self", OccurredAt: "2026-09-01T17:00:00Z#event-1", EventID: "event-1", MoodState: MoodState{Status: "okay", UpdatedAt: "2026-09-01T17:00:00Z"}}),
+		},
+		LastEvaluatedKey: map[string]types.AttributeValue{
+			"userId":     &types.AttributeValueMemberS{Value: "self"},
+			"occurredAt": &types.AttributeValueMemberS{Value: "2026-09-01T17:00:00Z#event-1"},
+		},
+	}}
+	items, token, err := NewDynamoDBStore(client, "users", "friendships", "moods").ListMoodEntries(context.Background(), "self", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 || items[0].EventID != "event-2" || items[0].Stress == nil || items[1].EventID != "event-1" || token == "" {
+		t.Fatalf("items=%#v token=%q", items, token)
+	}
+	if client.queryInput.ScanIndexForward == nil || *client.queryInput.ScanIndexForward || *client.queryInput.Limit != moodPageSize {
+		t.Fatalf("query=%#v", client.queryInput)
+	}
+	if got := client.queryInput.ExpressionAttributeValues[":userId"].(*types.AttributeValueMemberS).Value; got != "self" {
+		t.Fatalf("userId=%q", got)
+	}
+	decoded, err := decodeMoodPageToken(token)
+	if err != nil || decoded.UserID != "self" || decoded.OccurredAt == "" {
+		t.Fatalf("decoded=%#v err=%v", decoded, err)
+	}
+}
+
+func TestListMoodEntriesRejectsCrossUserToken(t *testing.T) {
+	client := &fakeDynamoDB{}
+	token, err := encodeMoodPageToken(moodPageToken{UserID: "other", OccurredAt: "timestamp#event"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = NewDynamoDBStore(client, "users", "friendships", "moods").ListMoodEntries(context.Background(), "self", token)
+	var domain *DomainError
+	if !errors.As(err, &domain) || domain.Status != http.StatusBadRequest || client.queryInput != nil {
+		t.Fatalf("err=%v query=%#v", err, client.queryInput)
+	}
+}
+
 func TestListFriendStatusesQueriesAcceptedRelationshipsAndPreservesOrder(t *testing.T) {
 	firstRelation := relationshipItem{UserID: "self", RelatedUserID: "friend-2", StatusRelatedUserID: "ACCEPTED#friend-2"}
 	secondRelation := relationshipItem{UserID: "self", RelatedUserID: "friend-1", StatusRelatedUserID: "ACCEPTED#friend-1"}

@@ -16,6 +16,7 @@ type fakeStore struct {
 	publishedEvent  string
 	publishedState  MoodState
 	items           []FriendStatus
+	moodEntries     []MoodEntry
 	nextToken       string
 	requestedToken  string
 	err             error
@@ -31,6 +32,11 @@ func (s *fakeStore) PublishMood(_ context.Context, userID, eventID string, state
 func (s *fakeStore) ListFriendStatuses(_ context.Context, userID, token string) ([]FriendStatus, string, error) {
 	s.publishedUserID, s.requestedToken = userID, token
 	return s.items, s.nextToken, s.err
+}
+
+func (s *fakeStore) ListMoodEntries(_ context.Context, userID, token string) ([]MoodEntry, string, error) {
+	s.publishedUserID, s.requestedToken = userID, token
+	return s.moodEntries, s.nextToken, s.err
 }
 
 func (s *fakeStore) ListNotificationRecipientIDs(_ context.Context, _ string) ([]string, error) {
@@ -128,6 +134,7 @@ func TestEveryMoodAndStatusRouteRequiresAuthentication(t *testing.T) {
 	handlers := fixedHandlers(&fakeStore{})
 	tests := map[string]func(context.Context, events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error){
 		"POST /moods":          handlers.PublishMood,
+		"GET /moods":           handlers.GetMoodEntries,
 		"GET /friend-statuses": handlers.GetFriendStatuses,
 	}
 	for name, invoke := range tests {
@@ -137,6 +144,31 @@ func TestEveryMoodAndStatusRouteRequiresAuthentication(t *testing.T) {
 				t.Fatalf("response = %#v, err = %v", got, err)
 			}
 		})
+	}
+}
+
+func TestGetMoodEntriesReturnsPaginationShape(t *testing.T) {
+	store := &fakeStore{nextToken: "next", moodEntries: []MoodEntry{{
+		EventID:   "event-1",
+		MoodState: MoodState{Status: "okay", UpdatedAt: "2026-09-01T18:30:45Z"},
+	}}}
+	request := authenticatedRequest("")
+	request.QueryStringParameters = map[string]string{"nextToken": "prior"}
+	got, _ := fixedHandlers(store).GetMoodEntries(context.Background(), request)
+	if got.StatusCode != http.StatusOK || store.publishedUserID != "user-123" || store.requestedToken != "prior" {
+		t.Fatalf("response=%#v store=%#v", got, store)
+	}
+	var body struct {
+		Data struct {
+			Items     []MoodEntry `json:"items"`
+			NextToken *string     `json:"nextToken"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(got.Body), &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Data.Items) != 1 || body.Data.Items[0].EventID != "event-1" || body.Data.NextToken == nil || *body.Data.NextToken != "next" {
+		t.Fatalf("body=%#v", body)
 	}
 }
 

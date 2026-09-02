@@ -55,7 +55,7 @@ notification_dlq_url="$(stack_output NotificationDeadLetterQueueUrl)"
 resources="$(aws cloudformation list-stack-resources --stack-name "$stack_name" --region "$region" --query StackResourceSummaries --output json)"
 functions="$(jq -r '.[] | select(.ResourceType == "AWS::Lambda::Function") | .PhysicalResourceId' <<<"$resources")"
 function_count="$(wc -w <<<"$functions" | tr -d ' ')"
-assert_equals "Lambda function count" 15 "$function_count"
+assert_equals "Lambda function count" 16 "$function_count"
 
 while IFS= read -r function_name; do
   [[ -n "$function_name" ]] || continue
