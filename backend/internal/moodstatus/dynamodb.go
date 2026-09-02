@@ -104,6 +104,11 @@ type pageToken struct {
 	RelatedUserID string `json:"r"`
 }
 
+type moodPageToken struct {
+	UserID     string `json:"u"`
+	OccurredAt string `json:"o"`
+}
+
 // PublishMood atomically appends a history event and replaces currentStatus.
 func (s *DynamoDBStore) PublishMood(ctx context.Context, userID, eventID string, state MoodState) error {
 	if s.usersTable == "" || s.moodEventsTable == "" {
@@ -138,6 +143,56 @@ func (s *DynamoDBStore) PublishMood(ctx context.Context, userID, eventID string,
 		return fmt.Errorf("publish mood transaction: %w", err)
 	}
 	return nil
+}
+
+// ListMoods returns the authenticated user's mood events newest-first.
+func (s *DynamoDBStore) ListMoods(ctx context.Context, userID, token string) ([]MoodEntry, string, error) {
+	if s.moodEventsTable == "" {
+		return nil, "", errors.New("mood event table configuration is incomplete")
+	}
+	input := &dynamodb.QueryInput{
+		TableName:              &s.moodEventsTable,
+		Limit:                  int32ptr(statusPageSize),
+		ScanIndexForward:       boolptr(false),
+		KeyConditionExpression: strptr("userId = :userId"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":userId": &types.AttributeValueMemberS{Value: userID},
+		},
+	}
+	if token != "" {
+		decoded, err := decodeMoodPageToken(token)
+		if err != nil || decoded.UserID != userID {
+			return nil, "", &DomainError{Status: http.StatusBadRequest, Code: "invalid_request", Message: "nextToken is invalid"}
+		}
+		input.ExclusiveStartKey = map[string]types.AttributeValue{
+			"userId":     &types.AttributeValueMemberS{Value: userID},
+			"occurredAt": &types.AttributeValueMemberS{Value: decoded.OccurredAt},
+		}
+	}
+	output, err := s.client.Query(ctx, input)
+	if err != nil {
+		return nil, "", fmt.Errorf("query mood events: %w", err)
+	}
+	var events []moodEvent
+	if err := attributevalue.UnmarshalListOfMaps(output.Items, &events); err != nil {
+		return nil, "", fmt.Errorf("decode mood events: %w", err)
+	}
+	items := make([]MoodEntry, 0, len(events))
+	for _, event := range events {
+		items = append(items, MoodEntry{EventID: event.EventID, MoodState: event.MoodState})
+	}
+	nextToken := ""
+	if len(output.LastEvaluatedKey) > 0 {
+		occurredAt, ok := stringAttribute(output.LastEvaluatedKey["occurredAt"])
+		if !ok || occurredAt == "" {
+			return nil, "", errors.New("mood query returned an invalid pagination key")
+		}
+		nextToken, err = encodeMoodPageToken(moodPageToken{UserID: userID, OccurredAt: occurredAt})
+		if err != nil {
+			return nil, "", fmt.Errorf("encode mood token: %w", err)
+		}
+	}
+	return items, nextToken, nil
 }
 
 // ListFriendStatuses reads only ACCEPTED relationships, then hydrates their users.
@@ -244,6 +299,23 @@ func decodePageToken(value string) (pageToken, error) {
 	var token pageToken
 	if err := json.Unmarshal(encoded, &token); err != nil || token.UserID == "" || token.RelatedUserID == "" {
 		return pageToken{}, errors.New("invalid token")
+	}
+	return token, nil
+}
+
+func encodeMoodPageToken(token moodPageToken) (string, error) {
+	encoded, err := json.Marshal(token)
+	return base64.RawURLEncoding.EncodeToString(encoded), err
+}
+
+func decodeMoodPageToken(value string) (moodPageToken, error) {
+	encoded, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return moodPageToken{}, err
+	}
+	var token moodPageToken
+	if err := json.Unmarshal(encoded, &token); err != nil || token.UserID == "" || token.OccurredAt == "" {
+		return moodPageToken{}, errors.New("invalid token")
 	}
 	return token, nil
 }

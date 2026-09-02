@@ -6,6 +6,7 @@ import type {
   FriendRequestsResponse,
   FriendStatusesResponse,
   FriendshipResponse,
+  MoodEntriesResponse,
   PaginatedResponse,
   ProfileResponse,
   PublishMoodRequest,
@@ -100,6 +101,13 @@ export function publishMood(request: PublishMoodRequest) {
     '/moods',
     jsonRequest('POST', request),
   );
+}
+
+export function getMoods(nextToken?: string) {
+  const params = new URLSearchParams();
+  if (nextToken) params.set('nextToken', nextToken);
+  const query = params.size ? `?${params.toString()}` : '';
+  return apiRequest<MoodEntriesResponse>(`/moods${query}`);
 }
 
 export function getFriendStatuses(nextToken?: string) {

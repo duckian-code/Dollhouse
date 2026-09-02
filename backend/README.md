@@ -21,6 +21,7 @@ handlers are intentionally thin entry points; reusable behavior belongs in
 | Friendship | Decline friend request | `cmd/decline-friend-request` |
 | Friendship | Remove friend | `cmd/remove-friend` |
 | Mood | Publish mood | `cmd/publish-mood` |
+| Mood | Get own mood history | `cmd/get-moods` |
 | Status | Get friend statuses | `cmd/get-friend-statuses` |
 | Notifications | Consume queued notifications | `cmd/notification-consumer` |
 

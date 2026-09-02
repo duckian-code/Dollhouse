@@ -31,7 +31,7 @@ type DomainError struct {
 
 func (e *DomainError) Error() string { return e.Message }
 
-// Handlers implements the mood publishing and friend-status routes.
+// Handlers implements the mood publishing and status routes.
 type Handlers struct {
 	store     Store
 	publisher NotificationPublisher
@@ -91,6 +91,23 @@ func (h *Handlers) PublishMood(ctx context.Context, request events.APIGatewayV2H
 		observability.Metric{Name: "NotificationRecipientsQueued", Value: float64(len(recipientIDs)), Unit: "Count"},
 	)
 	return response.JSON(http.StatusCreated, map[string]any{"data": map[string]any{"eventId": eventID, "status": state}})
+}
+
+// GetMoods returns the authenticated user's mood history.
+func (h *Handlers) GetMoods(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	userID, failure := authenticatedUserID(request)
+	if failure != nil {
+		return *failure, nil
+	}
+	items, nextToken, err := h.store.ListMoods(ctx, userID, request.QueryStringParameters["nextToken"])
+	if err != nil {
+		return h.failure(ctx, "get moods", err), nil
+	}
+	var token any
+	if nextToken != "" {
+		token = nextToken
+	}
+	return response.JSON(http.StatusOK, map[string]any{"data": map[string]any{"items": items, "nextToken": token}})
 }
 
 // GetFriendStatuses returns the current state of accepted friends only.

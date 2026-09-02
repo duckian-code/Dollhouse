@@ -290,6 +290,8 @@ mood_payload='{"status":"API verification mood","stress":4,"fatigue":null,"disco
 assert_status "publish mood" 201 "$(request POST /moods "$token_a" "$mood_payload")"
 mood_event_id="$(jq -er '.data.eventId' "$response_file")"
 assert_json "published mood contract" '.data.status.status == "API verification mood" and .data.status.stress == 4 and .data.status.fatigue == null and .data.status.discomfort == 0'
+assert_status "get own moods" 200 "$(request GET /moods "$token_a")"
+assert_json "own mood history" ".data.items[] | select(.eventId == \"$mood_event_id\" and .status == \"API verification mood\")"
 
 found_status=false
 for _ in {1..15}; do
